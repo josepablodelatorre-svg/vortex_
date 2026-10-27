@@ -675,6 +675,8 @@
   }
   #title .back { min-width: 0; margin-top: 22px; font-size: 9px; }
   #title .menunote { font-size: 7px !important; margin: -4px 0 6px !important; opacity: 0.6 !important; }
+  /* notes under a list (missions, upgrades) need room, not a tuck-under */
+  #streaktag + .menunote, #shoplist + .menunote { margin: 12px 0 0 !important; }
   #toggles {
     display: flex;
     gap: 8px;
@@ -682,6 +684,13 @@
     flex-wrap: wrap;
   }
   #toggles button { margin-top: 14px; margin-left: 0; }
+  #missionmult, #streaktag { font-size: 10px !important; color: #3f6; text-shadow: 0 0 8px #3f6; opacity: 1 !important; margin: 0 0 12px !important; }
+  #streaktag { color: #ff8c28; text-shadow: 0 0 8px #ff8c28; margin: 14px 0 0 !important; }
+  #missionlist { display: flex; flex-direction: column; gap: 8px; max-width: 460px; margin: 0 auto 10px; }
+  .missionrow { border: 1px solid rgba(60, 138, 255, 0.35); padding: 9px 10px; font-size: 9px; letter-spacing: 1px; text-align: left; }
+  .missionrow.done { border-color: #3f6; color: #3f6; }
+  .missionbar { height: 5px; border: 1px solid currentColor; margin-top: 7px; padding: 1px; }
+  .missionbar div { height: 100%; background: currentColor; }
   #hudcoins { float: right; color: #ffd23f; text-shadow: 0 0 6px #ffd23f; }
   #wallet { font-size: 12px !important; color: #ffd23f; text-shadow: 0 0 8px #ffd23f; opacity: 1 !important; margin: 0 0 14px !important; }
   #shoplist { display: flex; flex-direction: column; gap: 8px; max-width: 460px; margin: 0 auto 14px; }
@@ -1037,6 +1046,7 @@
       <button id="riftStart" class="riftBtn">ENTER THE RIFT</button>
       <button data-go="multi">MULTIPLAYER &gt;</button>
       <button data-go="hangar">HANGAR &gt;</button>
+      <button data-go="missions" id="missionsBtn">MISSIONS &gt;</button>
       <button data-go="shop" id="shopBtn">UPGRADES &gt;</button>
       <button data-go="settings">SETTINGS &gt;</button>
     </div>
@@ -1080,6 +1090,14 @@
       <button id="cyclesBtn">DAEMONS</button>
       <p class="menunote">RACE ON THE BUS. LEAVE WALLS, DON'T SEGFAULT</p>
     </div>
+    <button class="back" data-go="menu">&lt; BACK</button>
+  </section>
+  <section class="screen" data-screen="missions">
+    <h2>MISSIONS</h2>
+    <p id="missionmult"></p>
+    <div id="missionlist"></div>
+    <p id="streaktag"></p>
+    <p class="menunote">FINISH ALL THREE TO RAISE YOUR SCORE MULTIPLIER FOR GOOD</p>
     <button class="back" data-go="menu">&lt; BACK</button>
   </section>
   <section class="screen" data-screen="shop">
@@ -1586,6 +1604,7 @@ function spawnTrackItem() {
 }
 
 function triggerTrackItem(it) {
+  if (it.kind === 'boost' || it.kind === 'hoop' || it.kind === 'portal') missionEvent(it.kind);
   if (it.kind === 'boost') {
     boostTimer = PAD_TIME; brakeTimer = 0;
     score += 100;
@@ -1648,6 +1667,7 @@ function updateTrack(dt) {
         it.done = true;
         b.z = 2;
         score += 500;
+        missionEvent('vent');
         document.getElementById('score').textContent = score;
         shatterAt(it.angle, it.z, '255,160,60', 90, 2);
         triggerShake(16, 0.5);
@@ -1665,6 +1685,7 @@ function updateTrack(dt) {
         it.done = true;
         if (inShipLane(it.angle, TRACK_HIT + 0.08 * up('magnet'))) {
           addCoins(1);
+          missionEvent('coin');
           it.got = true;
           playZap();
         }
@@ -1875,6 +1896,98 @@ function spawnCoinRow() {
   for (let k = 0; k < 5; k++) trackItems.push({ kind: 'coin', angle, z: 1 + k * 0.05 });
 }
 
+// ---------- Missions + daily streak (saved as vortex-missions / vortex-streak) ----------
+// Three missions at a time from MISSION_POOL; each pays coins when done.
+// Finishing all three starts the next, slightly harder set and raises the
+// permanent score multiplier (missionMult). Progress is fed by
+// missionEvent(key, amount) calls at the matching moments in play.
+const MISSION_POOL = [
+  { id: 'kill',   text: 'DESTROY {n} ENEMIES', n: 150 },
+  { id: 'dodge',  text: 'DODGE {n} ENEMIES', n: 30 },
+  { id: 'coin',   text: 'COLLECT {n} COINS', n: 60 },
+  { id: 'boss',   text: 'DEFEAT {n} BOSSES', n: 3 },
+  { id: 'portal', text: 'USE {n} PORTALS', n: 4 },
+  { id: 'boost',  text: 'HIT {n} ARROW PADS', n: 6 },
+  { id: 'hoop',   text: 'FLY THROUGH {n} HOOPS', n: 4 },
+  { id: 'lockin', text: 'USE LOCK-IN {n} TIMES', n: 3 },
+  { id: 'disc',   text: 'HIT {n} TARGETS WITH DISCS', n: 10 },
+  { id: 'rock',   text: 'BREAK {n} ASTEROIDS', n: 10 },
+  { id: 'vent',   text: 'HIT {n} TRENCH VENTS', n: 1 },
+  { id: 'level',  text: 'REACH LEVEL {n}', n: 3, max: true }
+];
+let missionState = { set: 0, active: [] };
+let streak = { days: 0, last: '' };
+try {
+  missionState = JSON.parse(localStorage.getItem('vortex-missions') || 'null') || missionState;
+  streak = JSON.parse(localStorage.getItem('vortex-streak') || 'null') || streak;
+} catch (e) { /* storage unavailable */ }
+
+function missionMult() { return 1 + 0.1 * missionState.set; }
+function saveMissions() {
+  try { localStorage.setItem('vortex-missions', JSON.stringify(missionState)); } catch (e) { /* ignore */ }
+}
+function dealMissions() {
+  const pool = MISSION_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 3);
+  const scale = 1 + 0.25 * missionState.set;
+  missionState.active = pool.map(m => ({ id: m.id, n: m.max ? Math.min(LEVEL_COUNT, m.n + Math.floor(missionState.set / 2)) : Math.ceil(m.n * scale), p: 0 }));
+  saveMissions();
+}
+if (!missionState.active || missionState.active.length !== 3) dealMissions();
+
+function missionText(m) {
+  return MISSION_POOL.find(x => x.id === m.id).text.replace('{n}', m.n);
+}
+
+function missionEvent(key, amount) {
+  let changed = false;
+  for (const m of missionState.active) {
+    if (m.id !== key || m.p >= m.n) continue;
+    const def = MISSION_POOL.find(x => x.id === key);
+    m.p = def.max ? Math.max(m.p, amount) : m.p + (amount === undefined ? 1 : amount);
+    changed = true;
+    if (m.p >= m.n) {
+      m.p = m.n;
+      const reward = Math.round(30 * (1 + 0.2 * missionState.set));
+      coins += reward;
+      saveWallet();
+      showToast('MISSION COMPLETE: ' + missionText(m) + '\n+' + reward + ' COINS');
+      playPowerUp();
+    }
+  }
+  if (!changed) return;
+  if (missionState.active.every(m => m.p >= m.n)) {
+    missionState.set += 1;
+    dealMissions();
+    setTimeout(() => showToast('ALL MISSIONS DONE!\nSCORE MULTIPLIER x' + missionMult().toFixed(1)), 1800);
+  }
+  saveMissions();
+}
+
+function renderMissions() {
+  document.getElementById('missionmult').textContent = 'SET ' + (missionState.set + 1) + '   SCORE x' + missionMult().toFixed(1);
+  document.getElementById('missionlist').innerHTML = missionState.active.map(m => {
+    const done = m.p >= m.n;
+    return `<div class="missionrow${done ? ' done' : ''}">${done ? 'DONE: ' : ''}${missionText(m)}<span style="float:right">${m.p}/${m.n}</span>`
+      + `<div class="missionbar"><div style="width:${Math.round(m.p / m.n * 100)}%"></div></div></div>`;
+  }).join('');
+  document.getElementById('streaktag').textContent = streak.days > 0 ? 'DAILY STREAK: ' + streak.days + (streak.days === 1 ? ' DAY' : ' DAYS') : 'PLAY TODAY TO START A STREAK';
+}
+
+// first run of each day: extend (or restart) the streak and pay out
+function checkStreak() {
+  const today = todayKey();
+  if (streak.last === today) return;
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  const yesterday = y.getFullYear() + '-' + String(y.getMonth() + 1).padStart(2, '0') + '-' + String(y.getDate()).padStart(2, '0');
+  streak.days = streak.last === yesterday ? streak.days + 1 : 1;
+  streak.last = today;
+  try { localStorage.setItem('vortex-streak', JSON.stringify(streak)); } catch (e) { /* ignore */ }
+  const reward = 20 * Math.min(7, streak.days);
+  coins += reward;
+  saveWallet();
+  setTimeout(() => showToast('DAY ' + streak.days + ' STREAK!\n+' + reward + ' COINS'), 600);
+}
+
 // power: charged by kills, spent on lock-in mode
 const POWER_PER_KILL = 7;
 let power = 0;
@@ -1892,6 +2005,7 @@ let lockinAnnounced = false;
 function lockIn() {
   if (state !== 'playing' || power < 100 || lockinTimer > 0) return;
   lockinTimer = LOCKIN_DURATION;
+  missionEvent('lockin');
   lockinFireTimer = 0;
   triggerShake(6, 0.3);
   playPowerUp();
@@ -2401,6 +2515,7 @@ function updateDisc(dt) {
       e.discThrow = disc.id;
       bolts.push({ angle: e.angle, z: e.z, hidden: true });
       disc.hits = (disc.hits || 0) + 1;
+      missionEvent('disc');
       if (disc.hits >= 5) unlockAchievement('discmaster');
     }
   }
@@ -3134,13 +3249,23 @@ document.querySelectorAll('#shipcolor button').forEach((btn, i) => {
   });
 });
 
-let toastTimer = null;
+// toasts queue up, so a mission, a streak and an achievement landing
+// together are each shown in turn rather than overwriting one another
+let toastQueue = [];
+let toastBusy = false;
 function showToast(text) {
+  if (toastQueue[toastQueue.length - 1] === text) return;
+  toastQueue.push(text);
+  if (!toastBusy) nextToast();
+}
+function nextToast() {
   const el = document.getElementById('toast');
+  const text = toastQueue.shift();
+  if (text === undefined) { toastBusy = false; el.style.opacity = '0'; return; }
+  toastBusy = true;
   el.textContent = text;
   el.style.opacity = '1';
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.style.opacity = '0'; }, 3200);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(nextToast, 300); }, 2600);
 }
 
 function unlockAchievement(id) {
@@ -3407,6 +3532,7 @@ function startGame(continuing, mode) {
   plasmaHitAt = -99;
   power = 0;
   if (!continuing) runCoins = 0;
+  checkStreak();
   document.getElementById('hudcoins').textContent = runCoins ? 'COINS ' + runCoins : '';
   lockinTimer = 0;
   lockinBlend = 0;
@@ -3988,6 +4114,7 @@ function shipCallout(text, color) {
 // superzapper and applies the ship class's level-start perks.
 function onLevelStart() {
   zapperCharges = 1 + up('bomb');
+  if (gameMode === 'campaign') missionEvent('level', currentLevel);
   setEnv(routeEnv(), true);
   // the level banner names where this level starts
   const lb = document.getElementById('levelbanner');
@@ -4065,9 +4192,10 @@ function triggerNova() {
   for (const e of enemies) {
     if (!e.alive) continue;
     e.alive = false;
-    score += Math.round((e.type === 'pentagram' ? 30 : 10) * (gameMode === 'rift' ? riftMultiplier() : 1));
+    score += Math.round((e.type === 'pentagram' ? 30 : 10) * (gameMode === 'rift' ? riftMultiplier() : 1) * missionMult());
     killCount += 1;
     versusKill();
+    missionEvent('kill');
     burst(e.angle, e.z, { color: '255,120,255', bitColor: '#ff78ff', label: 'NOVA!', labelColor: '#ffb3ff' });
     shatterAt(e.angle, e.z, (ENEMY_COLORS[e.type] || ENEMY_COLORS.drone).rgb, 10, 1 - e.z * 0.6);
   }
@@ -4298,7 +4426,8 @@ function update(dt) {
       if (e.alive && e.z <= 0.03) {
         e.alive = false;
         if (inShipLane(e.angle)) damageShip(HULL_DAMAGE_PER_HIT);
-        else if (inShipLane(e.angle, LANE_HIT * 2.2)) {
+        else missionEvent('dodge');
+        if (!inShipLane(e.angle) && inShipLane(e.angle, LANE_HIT * 2.2)) {
           shipCallout('DODGED!', '#9fffb0');
           say('dodge', { en: ['CLOSE ONE!', 'WATCH YOUR SIX, HOTSHOT!', 'NICE MOVES!'], es: ['¡POR POCO!', '¡CUIDA TU RETAGUARDIA!', '¡BUENOS REFLEJOS!'] }, 1, 12);
         }
@@ -4513,10 +4642,12 @@ function update(dt) {
             }
           }
           e.alive = false;
-          score += Math.round((e.type === 'pentagram' ? 30 : 10) * (gameMode === 'rift' ? riftMultiplier() : 1));
+          score += Math.round((e.type === 'pentagram' ? 30 : 10) * (gameMode === 'rift' ? riftMultiplier() : 1) * missionMult());
           killCount += 1;
           killStreak += 1;
           versusKill();
+          missionEvent('kill');
+          if (e.type === 'rock') missionEvent('rock');
           power = Math.min(100, power + POWER_PER_KILL * (1 + 0.15 * up('core')));
           updatePlasmaUI();
           if (killStreak > 0 && killStreak % 10 === 0) {
@@ -4584,6 +4715,7 @@ function update(dt) {
             boss = null;
             updateBossUI();
             addCoins(wasMini ? 10 : 25);
+            if (!wasMini) missionEvent('boss');
             if (!wasMini) {
               setMusicTrack(gameplayTrack());
               if (bossFightDamage === 0) unlockAchievement('untouchable');
@@ -6829,6 +6961,9 @@ function showScreen(name) {
   document.querySelectorAll('#title .screen').forEach(sc => sc.classList.toggle('active', sc.dataset.screen === name));
   if (name === 'menu') updateLoadout();
   if (name === 'shop') renderShop();
+  if (name === 'missions') renderMissions();
+  const doneCount = missionState.active.filter(m => m.p >= m.n).length;
+  document.getElementById('missionsBtn').textContent = 'MISSIONS (' + doneCount + '/3) >';
   document.getElementById('shopBtn').textContent = 'UPGRADES (' + coins + ' C) >';
   document.getElementById('title').scrollTop = 0;
 }

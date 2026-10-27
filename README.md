@@ -333,6 +333,16 @@ saved (`vortex-coins`) and spent on the UPGRADES screen (`renderShop()`,
 (`chargeMul()` on timed pickups), COIN MAGNET, EXTRA BOMB, POWER CORE.
 Results show the run's coins. Coins are only ever earned by playing.
 
+**Missions + daily streak** — three active missions from `MISSION_POOL`
+(saved as `vortex-missions`), fed by `missionEvent(key, amount)` calls
+(kills, dodges, coins, bosses, portals, pads, hoops, lock-ins, disc hits,
+asteroids, vents, level reached). Each pays coins; finishing all three
+deals a bigger set and raises `missionMult()` (+0.1 to every kill score,
+for good). `checkStreak()` on the first run of each day extends or
+restarts `vortex-streak` and pays 20 × days (max 7). MISSIONS screen in
+the menu. Toasts now queue (`showToast` → `nextToast`) so several at
+once are each shown.
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups
