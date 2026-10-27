@@ -158,6 +158,17 @@ rush in along the walls. A spike reaching the rim within 0.35 rad of the
 aim hits for `SPIKE_DAMAGE`; bolts can shoot them. `finishWarp()` shows
 the next level's banner and calls `onLevelStart()`.
 
+**Commander transmissions** — `say(key, lines, priority, cooldown)` types
+a radio line into `#comms` (bottom-left) with a `playComms()` blip;
+`lines` may be an array picked at random, each key has its own cooldown,
+and a lower-priority line never cuts off a higher one mid-read.
+Event lines: run start, hits, pickups, 10-kill streaks (`killStreak`,
+reset by damage), miniboss/boss warnings, boss kills, warp start/arrival,
+spikes. `commsWatch()` adds situational nags each frame: low hull, swarm
+with the zapper still ready, enemies at close range, and not shooting for
+6s. `shipCallout()` floats big text from the ship (pickup names, "-16
+HULL"). Hidden whenever not playing.
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups
