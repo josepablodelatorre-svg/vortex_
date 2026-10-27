@@ -486,6 +486,32 @@
     cursor: pointer;
     text-shadow: 0 0 6px #ff8c28;
   }
+  #cyclesBtn {
+    display: block;
+    margin: 10px auto 0;
+    background: transparent;
+    border: 1px solid #22ddff;
+    color: #22ddff;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 9px 12px;
+    cursor: pointer;
+    text-shadow: 0 0 6px #22ddff;
+  }
+  #lobbyStart {
+    display: none;
+    margin: 0 auto 14px;
+    background: #22ddff;
+    border: none;
+    color: #000;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 12px 18px;
+    cursor: pointer;
+    box-shadow: 0 0 16px rgba(34, 221, 255, 0.6);
+  }
   #lobbyAccept {
     display: none;
     margin: 0 auto 14px;
@@ -791,6 +817,7 @@
   <button id="dailyBtn">DAILY TUNNEL</button>
   <button id="coopBtn">CO-OP: ADD PLAYERS</button>
   <button id="versusBtn">VERSUS: CHALLENGE A FRIEND</button>
+  <button id="cyclesBtn">LIGHT CYCLES</button>
   <button id="crtToggle" class="selected">CRT: ON</button>
   <button id="langToggle">COMMS: EN</button>
   <div id="jackin">
@@ -831,6 +858,7 @@
   <p id="lobbylink"></p>
   <div id="lobbyplayers"></div>
   <button id="lobbyAccept">ACCEPT CHALLENGE</button>
+  <button id="lobbyStart">START ROUND</button>
   <button id="lobbyClose">DONE</button>
 </div>
 <canvas id="digitize"></canvas>
@@ -1978,6 +2006,8 @@ function fire() {
 
 canvas.addEventListener('mousedown', (e) => {
   initAudio();
+  // light cycles: left button turns left, right button turns right
+  if (cyTurn(e.button === 2 ? 1 : -1)) return;
   // a click landing on the canvas itself (rather than the centered overlay
   // text) still needs to carry the "continuing" flag, or winning and then
   // clicking slightly off-center would silently drop the harder next run
@@ -2002,6 +2032,13 @@ document.getElementById('jackinBtn').addEventListener('click', (e) => {
 });
 
 window.addEventListener('keydown', (e) => {
+  if (state === 'cycles' || state === 'cyclesover') {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') { e.preventDefault(); cyTurn(-1); }
+    else if (e.code === 'ArrowRight' || e.code === 'KeyD') { e.preventDefault(); cyTurn(1); }
+    else if (e.code === 'Space' && state === 'cyclesover') { e.preventDefault(); cyNextRound(); }
+    else if (e.code === 'Escape') cyQuit();
+    return;
+  }
   if (e.code === 'Space') {
     e.preventDefault();
     superzap();
@@ -2016,6 +2053,8 @@ window.addEventListener('touchend', (e) => { if (!e.touches.length) pointerHeld 
 canvas.addEventListener('touchstart', (e) => {
   initAudio();
   const touch = e.touches[0];
+  // light cycles: tap the left or right half of the screen to turn
+  if (cyTurn(touch.clientX < W / 2 ? -1 : 1)) { e.preventDefault(); return; }
   pointerX = touch.clientX;
   pointerY = touch.clientY;
   updateAimFromPointer(pointerX, pointerY);
@@ -2524,6 +2563,7 @@ function startGame(continuing, mode) {
   powerupTimer = 6 + rng('powerup') * 4;
   difficulty = 1;
   state = 'playing';
+  document.getElementById('hud').style.display = '';
   document.getElementById('title').style.display = 'none';
   document.getElementById('gameover').style.display = 'none';
   document.getElementById('cleared').style.display = 'none';
@@ -3769,6 +3809,11 @@ function draw() {
   const b = Math.floor(60 * cycle + 55 * musicSwell);
   ctx.fillStyle = `rgba(${r},${g},${b},0.5)`;
   ctx.fillRect(0, 0, W, H);
+  if (state === 'cycles' || state === 'cyclesover') {
+    drawTunnel();
+    drawCycles();
+    drawVoxels();
+  }
 
   if (state === 'playing' || state === 'gameover' || state === 'cleared') {
     // bank the whole scene with the camera's lateral motion, like a cockpit
@@ -4934,14 +4979,19 @@ function openLobby() {
   const titles = {
     coop: ['CO-OP LINK', 'SCAN WITH A PHONE TO JOIN AS AN EXTRA GUNNER (UP TO 3)'],
     versus: ['VERSUS LINK', 'SCAN WITH ANOTHER DEVICE TO CHALLENGE IT. EACH SCREEN FLIES ITS OWN TUNNEL - LAST ONE FLYING WINS'],
-    join: ['VERSUS CHALLENGE', 'SOMEONE CHALLENGED YOU! TYPE YOUR NAME ON THE TITLE SCREEN OR JUST ACCEPT']
+    join: ['VERSUS CHALLENGE', 'SOMEONE CHALLENGED YOU! TYPE YOUR NAME ON THE TITLE SCREEN OR JUST ACCEPT'],
+    cycles: ['LIGHT CYCLES', 'START NOW AGAINST AI PROGRAMS, OR SCAN WITH ANOTHER DEVICE TO RIDE AGAINST A FRIEND'],
+    cyjoin: ['LIGHT CYCLES', 'YOU WERE INVITED TO THE GAME GRID. JOIN, THEN WAIT FOR THE HOST TO START THE ROUND']
   };
   document.querySelector('#lobby h2').textContent = titles[lobbyKind][0];
   document.querySelector('#lobby p').textContent = titles[lobbyKind][1];
-  document.getElementById('qrbox').style.display = lobbyKind === 'join' ? 'none' : 'inline-block';
-  document.getElementById('lobbyAccept').style.display = lobbyKind === 'join' ? 'block' : 'none';
+  const joining = lobbyKind === 'join' || lobbyKind === 'cyjoin';
+  document.getElementById('qrbox').style.display = joining ? 'none' : 'inline-block';
+  document.getElementById('lobbyAccept').style.display = joining ? 'block' : 'none';
+  document.getElementById('lobbyAccept').textContent = lobbyKind === 'cyjoin' ? 'JOIN THE GRID' : 'ACCEPT CHALLENGE';
+  document.getElementById('lobbyStart').style.display = lobbyKind === 'cycles' ? 'block' : 'none';
   renderLobby();
-  if (lobbyKind === 'join') return;
+  if (joining) return;
   if (netPeer || typeof Peer === 'undefined') {
     if (typeof Peer === 'undefined') document.getElementById('qrbox').textContent = 'LINK UNAVAILABLE';
     return;
@@ -4962,12 +5012,12 @@ function openLobby() {
 
 function renderLobby() {
   const box = document.getElementById('qrbox');
-  if (lobbyKind === 'join') {
+  if (lobbyKind === 'join' || lobbyKind === 'cyjoin') {
     document.getElementById('lobbylink').textContent = '';
     if (vsName) document.getElementById('lobbyplayers').textContent = 'LINKED WITH ' + vsName + '. GET READY...';
     return;
   }
-  const link = lobbyKind === 'versus' ? versusUrl() : padUrl();
+  const link = lobbyKind === 'versus' ? versusUrl() : lobbyKind === 'cycles' ? cyclesUrl() : padUrl();
   if (netId && typeof qrcode !== 'undefined') {
     const qr = qrcode(0, 'M');
     qr.addData(link);
@@ -4980,6 +5030,10 @@ function renderLobby() {
     document.getElementById('lobbyplayers').textContent = vsName ? vsName + ' ACCEPTED! STARTING...' : 'WAITING FOR A CHALLENGER...';
     return;
   }
+  if (lobbyKind === 'cycles') {
+    document.getElementById('lobbyplayers').textContent = cyConn ? cyGuestName + ' IS ON THE GRID' : 'NO FRIEND YET - AI PROGRAMS WILL RIDE';
+    return;
+  }
   document.getElementById('lobbyplayers').innerHTML = coPlayers.length
     ? coPlayers.map(cp => `<span style="color:${cp.color}">P${cp.slot + 2} ${cp.name}</span>`).join('<br>')
     : 'NO GUNNERS YET';
@@ -4989,7 +5043,8 @@ function onPadConnection(conn) {
   conn.on('data', (msg) => {
     if (!msg || typeof msg !== 'object') return;
     if (msg.t === 'vs-hello') { hostVersus(conn, msg); return; }
-    if (conn === vsConn) return; // versus traffic is handled in attachVersus
+    if (msg.t === 'cy-hello') { hostCycles(conn, msg); return; }
+    if (conn === vsConn || conn === cyConn) return; // handled by their own listeners
     let cp = coPlayers.find(c => c.conn === conn);
     if (msg.t === 'hello' && !cp) {
       const used = coPlayers.map(c => c.slot);
@@ -5304,6 +5359,347 @@ function maybeRematch() {
   }
 }
 
+// ---------- Light cycles (multiplayer stage 3) ----------
+// The visible stretch of tunnel becomes a Tron game grid wrapped round the
+// inside of the tube: CY_N cells around by CY_M cells deep. Riders move one
+// cell per CY_TICK, turn 90° left or right (in the rider's own frame) and
+// leave a solid light wall; hitting any wall, or the rim or far edge,
+// de-rezzes you. Last rider alive wins the round. Up to 4 riders: you, a
+// friend on another device, and AI riders filling the empty slots.
+// Networked games are host-authoritative: the host simulates every tick and
+// broadcasts positions; the guest only sends its turns.
+const CY_N = 96, CY_M = 40;
+const CY_Z0 = 0.05, CY_Z1 = 0.88;
+const CY_TICK = 1 / 15;
+const CY_COLORS = ['#22ddff', '#ff8c28', '#3f6', '#ff3cdc'];
+const CY_DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]]; // +around, deeper, -around, toward the rim
+let cyRiders = [];   // { name, color, i, j, dir, alive, trail: [[i, j]...], ai, turn, fadeAt }
+let cyGrid = new Int8Array(CY_N * CY_M);
+let cyTickTimer = 0;
+let cyMe = 0;        // which rider this screen controls
+let cyHosting = true;
+let cyConn = null;   // host: the guest's connection / guest: the host's
+let cyGuestName = '';
+let cyRoundOver = false;
+let cyEndTimer = 0;
+const cyJoinId = (/[?&]cycles=([^&]+)/.exec(location.search) || [])[1];
+
+function cyCell(i, j) {
+  return cyGrid[j * CY_N + ((i % CY_N) + CY_N) % CY_N];
+}
+function cyPoint(i, j) {
+  return pointOnRing(((i + 0.5) / CY_N) * Math.PI * 2, CY_Z0 + ((j + 0.5) / CY_M) * (CY_Z1 - CY_Z0), { visual: false });
+}
+
+function cyclesUrl() {
+  const url = new URL(location.href);
+  url.search = '';
+  url.searchParams.set('cycles', netId);
+  const ph = /[?&]peerhost=([^&]+)/.exec(location.search);
+  if (ph) url.searchParams.set('peerhost', decodeURIComponent(ph[1]));
+  return url.toString();
+}
+
+function cySend(msg) {
+  if (cyConn && cyConn.open) cyConn.send(msg);
+}
+
+// host: lay out a fresh round (2 starting at the rim heading deeper, the
+// others from the far edge heading out, spread around the ring)
+function cyNewRound() {
+  cyGrid = new Int8Array(CY_N * CY_M);
+  const names = [readPilotName(), cyConn ? cyGuestName : null];
+  cyRiders = [];
+  for (let k = 0; k < 4; k++) {
+    const human = k === 0 || (k === 1 && cyConn);
+    const i = Math.floor((k * CY_N) / 4 + CY_N / 8);
+    const j = k % 2 === 0 ? 2 : CY_M - 3;
+    cyRiders.push({ name: human ? names[k] : 'PROGRAM ' + (k + 1), color: CY_COLORS[k], i, j, dir: k % 2 === 0 ? 1 : 3,
+                    alive: true, trail: [[i, j]], ai: !human, turn: 0, fadeAt: 0 });
+    cyGrid[j * CY_N + i] = k + 1;
+  }
+  cyMe = 0;
+  cyStartLocal();
+  cySend({ t: 'cy-start', you: 1, riders: cyRiders.map(r => ({ name: r.name, color: r.color, i: r.i, j: r.j, dir: r.dir })) });
+}
+
+function cyStartLocal() {
+  cyRoundOver = false;
+  cyEndTimer = 0;
+  cyTickTimer = 0.9; // a beat before the riders launch
+  voxels = [];
+  state = 'cycles';
+  for (const id of ['title', 'gameover', 'cleared', 'lobby', 'hud']) document.getElementById(id).style.display = 'none';
+  showLevelBanner(cyRiders[cyMe].name + ' - ' + (lang === 'es' ? 'GIRA CON IZQ / DER' : 'TURN WITH LEFT / RIGHT'));
+  setMusicTrack('boss');
+}
+
+// START ROUND in the lobby: any friend who joined rides as rider 2
+function startCycles() {
+  initAudio();
+  cyHosting = true;
+  cyNewRound();
+}
+
+// simple AI: keep going if the next few cells are clear, else turn toward
+// the side with more open space; now and then turn just to be unpredictable
+function cyAiTurn(r) {
+  const clear = (dir, steps) => {
+    let i = r.i, j = r.j;
+    for (let k = 0; k < steps; k++) {
+      i += CY_DIRS[dir][0]; j += CY_DIRS[dir][1];
+      if (j < 0 || j >= CY_M || cyCell(i, j)) return k;
+    }
+    return steps;
+  };
+  const left = (r.dir + 3) % 4, right = (r.dir + 1) % 4;
+  const ahead = clear(r.dir, 4);
+  if (ahead >= 4 && Math.random() > 0.03) return 0;
+  const l = clear(left, 12), rr = clear(right, 12);
+  if (ahead >= 4 && l < 3 && rr < 3) return 0;
+  if (l === rr) return Math.random() < 0.5 ? -1 : 1;
+  return l > rr ? -1 : 1;
+}
+
+function cyCrash(r, k) {
+  r.alive = false;
+  r.fadeAt = t + 1.2; // its wall de-rezzes a moment later, freeing the space
+  const pt = cyPoint(r.i, r.j);
+  derez(pt.x, pt.y, hexToRgb(r.color), 70, 1.6);
+  triggerShake(k === cyMe ? 14 : 6, 0.3);
+  playDamage();
+}
+
+// host: one simulation step for every rider
+function cyStep() {
+  const moves = [];
+  cyRiders.forEach((r, k) => {
+    if (!r.alive) return;
+    if (r.ai) r.turn = cyAiTurn(r);
+    if (r.turn) { r.dir = (r.dir + (r.turn > 0 ? 1 : 3)) % 4; r.turn = 0; }
+    const ni = ((r.i + CY_DIRS[r.dir][0]) % CY_N + CY_N) % CY_N;
+    const nj = r.j + CY_DIRS[r.dir][1];
+    moves.push({ k, ni, nj });
+  });
+  for (const m of moves) {
+    const r = cyRiders[m.k];
+    const head = moves.filter(o => o.ni === m.ni && o.nj === m.nj).length > 1; // two riders, one cell
+    if (m.nj < 0 || m.nj >= CY_M || cyCell(m.ni, m.nj) || head) { m.crash = true; }
+  }
+  for (const m of moves) {
+    const r = cyRiders[m.k];
+    if (m.crash) { cyCrash(r, m.k); continue; }
+    r.i = m.ni; r.j = m.nj;
+    r.trail.push([r.i, r.j]);
+    cyGrid[r.j * CY_N + r.i] = m.k + 1;
+  }
+  cySend({ t: 'cy-tick', r: cyRiders.map(r => [r.i, r.j, r.dir, r.alive ? 1 : 0]) });
+}
+
+// remove a crashed rider's wall from the grid
+function cyClearTrail(k) {
+  const r = cyRiders[k];
+  for (const [i, j] of r.trail) { if (cyGrid[j * CY_N + i] === k + 1) cyGrid[j * CY_N + i] = 0; }
+  r.trail = [];
+}
+
+function updateCycles(dt) {
+  if (state !== 'cycles' && state !== 'cyclesover') return;
+  cyRiders.forEach((r, k) => { if (!r.alive && r.fadeAt && t > r.fadeAt) { r.fadeAt = 0; cyClearTrail(k); } });
+  if (state === 'cyclesover') return;
+  if (!cyHosting) return; // the guest just renders what the host sends
+  cyTickTimer -= dt;
+  while (cyTickTimer <= 0 && !cyRoundOver) {
+    cyTickTimer += CY_TICK;
+    cyStep();
+    const alive = cyRiders.filter(r => r.alive);
+    if (alive.length <= 1) {
+      cyRoundOver = true;
+      cyEndRound(alive.length ? cyRiders.indexOf(alive[0]) : -1);
+      cySend({ t: 'cy-end', w: alive.length ? cyRiders.indexOf(alive[0]) : -1 });
+    }
+  }
+}
+
+function cyEndRound(w) {
+  state = 'cyclesover';
+  const winner = w >= 0 ? cyRiders[w] : null;
+  const text = !winner ? 'NO SURVIVORS' : w === cyMe ? (lang === 'es' ? '¡GANASTE!' : 'YOU WIN!') : winner.name + (lang === 'es' ? ' GANA' : ' WINS');
+  showLevelBanner(text);
+  levelBannerTimer = 999;
+  showToast(lang === 'es' ? 'CLIC: OTRA RONDA   ESC: MENU' : 'CLICK: NEXT ROUND   ESC: MENU');
+  if (winner && w === cyMe) playPowerUp();
+  setMusicTrack('garden');
+}
+
+function cyNextRound() {
+  if (cyHosting) cyNewRound();
+  else cySend({ t: 'cy-again' });
+}
+
+function cyQuit() {
+  state = 'title';
+  document.getElementById('levelbanner').style.opacity = '0';
+  levelBannerTimer = 0;
+  document.getElementById('title').style.display = '';
+  document.getElementById('hud').style.display = '';
+  setMusicTrack('garden');
+}
+
+// input: returns true when it handled the event
+function cyTurn(d) {
+  if (state === 'cyclesover') { cyNextRound(); return true; }
+  if (state !== 'cycles') return false;
+  const me = cyRiders[cyMe];
+  if (!me || !me.alive) return true;
+  if (cyHosting) me.turn = d;
+  else cySend({ t: 'cy-turn', d });
+  playZap();
+  return true;
+}
+
+function drawCycles() {
+  if (state !== 'cycles' && state !== 'cyclesover') return;
+  // the arena edges: the rim and the far wall
+  ctx.save();
+  ctx.lineWidth = 2;
+  for (const z of [CY_Z0, CY_Z1]) {
+    ctx.beginPath();
+    for (let s = 0; s <= 72; s++) {
+      const pt = pointOnRing((s / 72) * Math.PI * 2, z, { visual: false });
+      if (s === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+    }
+    ctx.strokeStyle = 'rgba(80,230,255,0.6)';
+    ctx.shadowColor = '#50e6ff';
+    ctx.shadowBlur = 12;
+    ctx.stroke();
+  }
+  // the grid itself, faint
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(80,230,255,0.12)';
+  for (let i = 0; i < CY_N; i += 4) {
+    const a = cyPoint(i - 0.5, -0.5), b = cyPoint(i - 0.5, CY_M - 0.5);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+  for (let j = 0; j <= CY_M; j += 4) {
+    ctx.beginPath();
+    for (let i = 0; i <= CY_N; i += 2) {
+      const pt = cyPoint(i - 0.5, j - 0.5);
+      if (i === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+    }
+    ctx.stroke();
+  }
+  // light walls + riders
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  cyRiders.forEach((r, k) => {
+    if (!r.trail.length) return;
+    const fading = !r.alive;
+    ctx.strokeStyle = fading ? hexToRgba(r.color, 0.35 + 0.3 * Math.sin(t * 30)) : r.color;
+    ctx.shadowColor = r.color;
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    let prev = null;
+    for (const [i, j] of r.trail) {
+      const pt = cyPoint(i, j);
+      // don't draw a line across the seam where the ring wraps round
+      if (!prev || Math.abs(i - prev[0]) > 1) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+      prev = [i, j];
+    }
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    if (r.alive) {
+      const pt = cyPoint(r.i, r.j);
+      const sz = 5 + 10 * (1 - r.j / CY_M);
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, sz * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+      if (k === cyMe) {
+        ctx.strokeStyle = '#ffe14d';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, sz * 1.6 + Math.sin(t * 8) * 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  });
+  ctx.restore();
+  // roster
+  ctx.save();
+  ctx.font = "9px 'Press Start 2P', 'Courier New', monospace";
+  ctx.textAlign = 'left';
+  cyRiders.forEach((r, k) => {
+    ctx.fillStyle = r.alive ? r.color : 'rgba(255,255,255,0.3)';
+    ctx.fillText((k === cyMe ? '> ' : '  ') + r.name + (r.alive ? '' : '  DE-REZZED'), 20, 30 + k * 18);
+  });
+  ctx.restore();
+}
+
+// network: host side
+function hostCycles(conn, msg) {
+  if (cyConn && cyConn.open) { conn.send({ t: 'cy-busy' }); return; }
+  cyConn = conn;
+  cyHosting = true;
+  cyGuestName = String(msg.name || 'USER').toUpperCase().replace(/[^A-Z0-9 ÑÜ_-]/g, '').slice(0, 10) || 'USER';
+  showToast(cyGuestName + ' JOINED THE GRID');
+  renderLobby();
+  conn.on('data', (m) => {
+    if (!m || conn !== cyConn) return;
+    if (m.t === 'cy-turn' && cyRiders[1] && cyRiders[1].alive && !cyRiders[1].ai) cyRiders[1].turn = m.d > 0 ? 1 : -1;
+    else if (m.t === 'cy-again' && state === 'cyclesover') cyNewRound();
+  });
+  conn.on('close', () => { if (conn === cyConn) { cyConn = null; showToast(cyGuestName + ' LEFT THE GRID'); if (cyRiders[1]) cyRiders[1].ai = true; } });
+}
+
+// network: guest side
+function joinCycles() {
+  const name = readPilotName();
+  initAudio();
+  document.getElementById('lobbyAccept').style.display = 'none';
+  document.getElementById('lobbyplayers').textContent = 'CONNECTING...';
+  const peer = new Peer(peerOptions());
+  netPeer = peer;
+  cyHosting = false;
+  peer.on('open', () => {
+    const conn = peer.connect(cyJoinId, { reliable: true });
+    conn.on('open', () => {
+      cyConn = conn;
+      conn.send({ t: 'cy-hello', name });
+      document.getElementById('lobbyplayers').textContent = 'ON THE GRID. WAITING FOR THE HOST TO START...';
+    });
+    conn.on('data', (m) => {
+      if (!m) return;
+      if (m.t === 'cy-start') {
+        cyGrid = new Int8Array(CY_N * CY_M);
+        cyRiders = m.riders.map((r, k) => ({ ...r, alive: true, trail: [[r.i, r.j]], ai: false, turn: 0, fadeAt: 0 }));
+        cyRiders.forEach((r, k) => { cyGrid[r.j * CY_N + r.i] = k + 1; });
+        cyMe = m.you;
+        cyStartLocal();
+      } else if (m.t === 'cy-tick') {
+        m.r.forEach(([i, j, dir, alive], k) => {
+          const r = cyRiders[k];
+          if (!r) return;
+          if (r.alive && !alive) { cyCrash(r, k); return; }
+          if (!r.alive) return;
+          if (i !== r.i || j !== r.j) { r.trail.push([i, j]); cyGrid[j * CY_N + i] = k + 1; }
+          r.i = i; r.j = j; r.dir = dir;
+        });
+      } else if (m.t === 'cy-end') {
+        cyEndRound(m.w);
+      }
+    });
+    conn.on('close', () => { showToast('HOST LEFT THE GRID'); cyQuit(); });
+  });
+  peer.on('error', (err) => {
+    document.getElementById('lobbyplayers').textContent = err.type === 'peer-unavailable'
+      ? 'GRID NOT FOUND - IS THE OTHER SCREEN STILL OPEN?' : 'CONNECTION FAILED (' + err.type + ')';
+  });
+}
+
 // daily tunnel, clip and share buttons (wired last: they use the sections above)
 updateDailyBtn();
 document.getElementById('dailyBtn').addEventListener('click', (e) => {
@@ -5324,7 +5720,16 @@ for (const btn of document.querySelectorAll('.shareBtn')) {
 }
 document.getElementById('coopBtn').addEventListener('click', (e) => { e.stopPropagation(); lobbyKind = 'coop'; openLobby(); });
 document.getElementById('versusBtn').addEventListener('click', (e) => { e.stopPropagation(); openVersusLobby(); });
-document.getElementById('lobbyAccept').addEventListener('click', (e) => { e.stopPropagation(); acceptVersus(); });
+document.getElementById('lobbyAccept').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (lobbyKind === 'cyjoin') joinCycles(); else acceptVersus();
+});
+document.getElementById('cyclesBtn').addEventListener('click', (e) => { e.stopPropagation(); readPilotName(); lobbyKind = 'cycles'; openLobby(); });
+document.getElementById('lobbyStart').addEventListener('click', (e) => { e.stopPropagation(); startCycles(); });
+if (cyJoinId) {
+  lobbyKind = 'cyjoin';
+  openLobby();
+}
 // opened from a versus QR code: go straight to the challenge screen
 if (vsJoinId) {
   lobbyKind = 'join';
@@ -5360,6 +5765,7 @@ function loop(now) {
   updateJackIn(dt);
   updateCoPlayers(dt);
   updateVersus(dt);
+  updateCycles(dt);
   drawPortrait();
   updateClipRecording(dt);
   if (state === 'title') drawShipPreview();

@@ -409,6 +409,18 @@ the survivor gets VICTORY (`versusWin()`), the other DEFEATED, and clicking
 either asks for a rematch (both must click). Versus scores don't touch the
 solo records.
 
+**Light cycles (stage 3)** — LIGHT CYCLES opens a lobby (QR for
+`index.html?cycles=<id>`) with START ROUND. The visible tunnel becomes a
+`CY_N`×`CY_M` grid on the tube wall (`cyPoint()` maps cells through
+`pointOnRing(..., { visual: false })`). Up to 4 riders (you, a joined
+friend, AI `PROGRAM`s for the rest) move one cell per `CY_TICK`, turn 90°
+in their own frame (left/right arrows or A/D, mouse buttons, tap screen
+halves) and leave walls in `cyGrid`; walls, the rim and the far edge
+de-rez you, and a crashed rider's wall clears 1.2s later. Last one alive
+wins; click for the next round, ESC for the menu. Host-authoritative: the
+host runs `cyStep()` and sends `cy-start` / `cy-tick` / `cy-end`; the
+guest only sends `cy-turn` / `cy-again`.
+
 ## Ideas discussed but not yet built
 
 From comparing notes against Vecter (Steam), linefire/VectorSwarm, and a
