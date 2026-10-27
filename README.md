@@ -290,6 +290,14 @@ charged `POWER_PER_KILL` per kill. The bomb (zapper) shows as `BOMB x1`.
 the ship flies a tighter ring further in, can ride the whole 360°, slides
 twice as fast and auto-fires; power drains as it runs.
 
+**Track objects** — `trackItems` spawn every few seconds in lanes on the
+ship's arc and ride in with the tunnel; reaching the rim inside the ship's
+lane (`TRACK_HIT`) triggers them (`triggerTrackItem()`): `boost` arrow pad
+(`padSpeed()`/`padPull()` ×2.2/×1.35 for `PAD_TIME`, +100), `brake` zebra
+pad (×0.5/×0.6), psychedelic `hoop` (a random pickup + `tripTimer`, a
+hue-rotate CSS filter on the canvas) and `portal` (teleports the ship to
+the mirror lane, or straight across the ring during lock-in).
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups

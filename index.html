@@ -1471,6 +1471,184 @@ const PLASMA_FRACTION = 0.4;      // of the hull's max
 const PLASMA_REGEN = 7;           // per second...
 const PLASMA_REGEN_DELAY = 2.5;   // ...once this long has passed since the last hit
 let plasma = 0, plasmaMax = 0, plasmaHitAt = -99;
+// ---------- Track objects: pads, hoops and portals on the tunnel floor ----------
+// They ride in with the tunnel in lanes the ship can reach (the lower half)
+// and trigger when they reach the rim inside the ship's lane:
+//   boost  (yellow arrow pad)  everything rushes for PAD_TIME, +100 points
+//   brake  (zebra pad)         everything slows for PAD_TIME, a breather
+//   hoop   (psychedelic ring)  a random ability + a hue-shifting trip
+//   portal (purple swirl)      teleports the ship to the mirror lane
+const PAD_TIME = 3;
+const TRACK_HIT = 0.34;
+let trackItems = [];   // { kind, angle, z }
+let trackTimer = 6;
+let boostTimer = 0, brakeTimer = 0, tripTimer = 0;
+let teleportFlash = 0;
+
+// speed multipliers from pads: tunnel scroll, and how hard enemies are pulled in
+function padSpeed() {
+  return boostTimer > 0 ? 2.2 : brakeTimer > 0 ? 0.5 : 1;
+}
+function padPull() {
+  return boostTimer > 0 ? 1.35 : brakeTimer > 0 ? 0.6 : 1;
+}
+
+function spawnTrackItem() {
+  const r = Math.random();
+  const kind = r < 0.33 ? 'boost' : r < 0.58 ? 'brake' : r < 0.8 ? 'hoop' : 'portal';
+  // somewhere on the ship's arc: 3 to 9 o'clock (anywhere during lock-in)
+  const angle = lockinTimer > 0 ? normalizeAngle(Math.random() * Math.PI * 2)
+    : normalizeAngle(Math.PI + (Math.random() - 0.5) * Math.PI * 0.95);
+  trackItems.push({ kind, angle, z: 1 });
+}
+
+function triggerTrackItem(it) {
+  if (it.kind === 'boost') {
+    boostTimer = PAD_TIME; brakeTimer = 0;
+    score += 100;
+    document.getElementById('score').textContent = score;
+    shipCallout('BOOST +100', '#ffe14d');
+    playBass(140, 0.3);
+    triggerShake(5, 0.4);
+    say('boost', { en: ['IN THE PIPE, FIVE BY FIVE!', 'HANG ON, PILOT, WE ARE FLYING!'], es: ['¡EN EL TUBO, CINCO POR CINCO!', '¡AGARRATE, PILOTO, VAMOS VOLANDO!'] }, 1, 10);
+  } else if (it.kind === 'brake') {
+    brakeTimer = PAD_TIME; boostTimer = 0;
+    shipCallout('SLOW-MO', '#ffffff');
+    playBass(50, 0.4);
+    say('brake', { en: ['EASY. KEEP YOUR VELOCITY DOWN.', 'BREATHE, PILOT. LINE UP YOUR SHOTS.'], es: ['CALMA. BAJA LA VELOCIDAD.', 'RESPIRA, PILOTO. APUNTA BIEN.'] }, 1, 10);
+  } else if (it.kind === 'hoop') {
+    tripTimer = 2.8;
+    const gifts = ['star', 'echo', 'shield', 'overdrive', 'disc'];
+    collectPowerup({ angle: it.angle, z: 0.02, alive: true, kind: gifts[Math.floor(Math.random() * gifts.length)] });
+    say('hoop', { en: ['WHAT WAS THAT?! YOU ARE GLOWING, PILOT!', 'WHOA. EVERYTHING IS... COLOURS.'], es: ['¡¿QUE FUE ESO?! ¡ESTAS BRILLANDO, PILOTO!', 'UF. TODO ES... COLORES.'] }, 2, 10);
+  } else if (it.kind === 'portal') {
+    // the mirror lane: across the screen (or straight across the ring in lock-in)
+    shipLane = normalizeAngle(lockinTimer > 0 ? shipLane + Math.PI : -shipLane);
+    shipX = shipScreenPos(shipLane).x - CX;
+    teleportFlash = 1;
+    const pos = shipScreenPos(shipLane);
+    shatter(pos.x, pos.y, '200,120,255', 40, 1.4);
+    playHack();
+    shipCallout('TELEPORT!', '#c878ff');
+    say('portal', { en: ['ROLL, PILOT, ROLL!', 'WHERE DID YOU... OH. NICE.'], es: ['¡GIRA, PILOTO, GIRA!', '¿A DONDE TE... AH. BIEN.'] }, 1, 10);
+  }
+}
+
+function updateTrack(dt) {
+  boostTimer = Math.max(0, boostTimer - dt);
+  brakeTimer = Math.max(0, brakeTimer - dt);
+  tripTimer = Math.max(0, tripTimer - dt);
+  teleportFlash = Math.max(0, teleportFlash - dt * 3);
+  // the psychedelic hue trip is a CSS filter on the canvas
+  canvas.style.filter = tripTimer > 0 ? `hue-rotate(${Math.round(t * 400) % 360}deg) saturate(1.8)` : '';
+  if (state !== 'playing') return;
+  if (!calmPhase()) {
+    trackTimer -= dt;
+    if (trackTimer <= 0) {
+      spawnTrackItem();
+      trackTimer = 3.5 + Math.random() * 3;
+    }
+  }
+  const speed = effectiveTunnelSpeed() * warpBoost() * padSpeed();
+  for (const it of trackItems) {
+    it.z -= speed * dt;
+    if (it.z <= 0.03 && !it.done) {
+      it.done = true;
+      if (inShipLane(it.angle, TRACK_HIT)) triggerTrackItem(it);
+    }
+  }
+  trackItems = trackItems.filter(it => it.z > -0.05);
+}
+
+// a flat patch on the tunnel wall: four corners at angle ± half, z .. z + len
+function wallPatch(angle, half, z, len) {
+  return [pointOnRing(angle - half, z), pointOnRing(angle + half, z),
+          pointOnRing(angle + half, Math.min(1, z + len)), pointOnRing(angle - half, Math.min(1, z + len))];
+}
+
+function drawTrackItems() {
+  if (!trackItems.length) return;
+  ctx.save();
+  for (const it of trackItems) {
+    if (it.z < 0 || it.z > 1) continue;
+    const near = 1 - it.z;
+    if (it.kind === 'boost' || it.kind === 'brake') {
+      const quad = wallPatch(it.angle, 0.17, it.z, 0.09);
+      ctx.beginPath();
+      quad.forEach((pt, i) => i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
+      ctx.closePath();
+      ctx.fillStyle = it.kind === 'boost' ? `rgba(255,225,77,${0.25 + 0.3 * near})` : `rgba(255,255,255,${0.12 + 0.2 * near})`;
+      ctx.fill();
+      ctx.lineWidth = 1 + 2 * near;
+      if (it.kind === 'boost') {
+        // three chevrons pointing toward the player
+        ctx.strokeStyle = '#ffe14d';
+        ctx.shadowColor = '#ffe14d';
+        ctx.shadowBlur = 12;
+        for (let k = 0; k < 3; k++) {
+          const zz = it.z + 0.015 + k * 0.025;
+          const l = pointOnRing(it.angle - 0.13, zz + 0.02), m = pointOnRing(it.angle, zz), r = pointOnRing(it.angle + 0.13, zz + 0.02);
+          ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(m.x, m.y); ctx.lineTo(r.x, r.y); ctx.stroke();
+        }
+      } else {
+        // zebra stripes across the pad
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2 + 4 * near;
+        for (let k = 0; k < 4; k++) {
+          const zz = it.z + 0.01 + k * 0.022;
+          const a = pointOnRing(it.angle - 0.17, zz), b = pointOnRing(it.angle + 0.17, zz);
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        }
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        quad.forEach((pt, i) => i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
+        ctx.closePath();
+        ctx.stroke();
+      }
+      ctx.shadowBlur = 0;
+    } else {
+      const pt = pointOnRing(it.angle, it.z);
+      // hovering a little off the wall, toward the centre
+      const x = pt.x + (CX - pt.x) * 0.08, y = pt.y + (CY - pt.y) * 0.08;
+      const r = 6 + 34 * near;
+      if (it.kind === 'hoop') {
+        ctx.lineWidth = 2 + 4 * near;
+        for (let k = 0; k < 12; k++) {
+          ctx.beginPath();
+          ctx.ellipse(x, y, r, r * 0.6, 0, (k / 12) * Math.PI * 2, ((k + 1) / 12) * Math.PI * 2);
+          ctx.strokeStyle = `hsl(${(k * 30 + t * 300) % 360}, 100%, 60%)`;
+          ctx.shadowColor = ctx.strokeStyle;
+          ctx.shadowBlur = 14;
+          ctx.stroke();
+        }
+      } else {
+        // portal: a purple swirl spinning into itself
+        ctx.strokeStyle = '#c878ff';
+        ctx.shadowColor = '#c878ff';
+        ctx.shadowBlur = 18;
+        ctx.lineWidth = 1.5 + 2 * near;
+        ctx.beginPath();
+        for (let k = 0; k <= 40; k++) {
+          const a = k * 0.45 + t * 6, rr = r * (k / 40);
+          const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr * 0.6;
+          if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(x, y, r, r * 0.6, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.shadowBlur = 0;
+    }
+  }
+  ctx.restore();
+  if (teleportFlash > 0) {
+    ctx.fillStyle = `rgba(200,120,255,${0.25 * teleportFlash})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
 // power: charged by kills, spent on lock-in mode
 const POWER_PER_KILL = 7;
 let power = 0;
@@ -2798,6 +2976,9 @@ function startGame(continuing, mode) {
   power = 0;
   lockinTimer = 0;
   lockinBlend = 0;
+  trackItems = [];
+  trackTimer = 6;
+  boostTimer = 0; brakeTimer = 0; tripTimer = 0;
   lockinAnnounced = false;
   shipLane = Math.PI;
   shipLaneVel = 0;
@@ -3531,6 +3712,8 @@ function updateTripleUI() {
   if (overdriveTimer > 0) lines.push('OVERDRIVE ' + overdriveTimer.toFixed(1) + 's');
   if (echoTimer > 0) lines.push('ECHO ' + echoTimer.toFixed(1) + 's');
   if (discCharges > 0) lines.push('DISC x' + discCharges);
+  if (boostTimer > 0) lines.push('BOOST ' + boostTimer.toFixed(1) + 's');
+  if (brakeTimer > 0) lines.push('SLOW-MO ' + brakeTimer.toFixed(1) + 's');
   el.textContent = lines.join('\n');
   el.style.display = lines.length ? 'block' : 'none';
 }
@@ -3555,7 +3738,7 @@ function update(dt) {
   aimTrail.push({ t, angle: aimAngle });
   while (aimTrail.length && aimTrail[0].t < t - 0.5) aimTrail.shift();
   updateComms(dt);
-  tunnelTravel += effectiveTunnelSpeed() * warpBoost() * dt;
+  tunnelTravel += effectiveTunnelSpeed() * warpBoost() * padSpeed() * dt;
   updateMusicMood(dt);
 
   // camera bank, from how fast the path is sliding sideways right now
@@ -3599,7 +3782,7 @@ function update(dt) {
     const diffParams = getDiffParams();
     difficulty = 1 + runT * diffParams.rampRate + (currentLevel - 1) * 0.25;
 
-    const pullFactor = 1 + (effectiveTunnelSpeed() / TUNNEL_SPEED - 1) * 0.4;
+    const pullFactor = (1 + (effectiveTunnelSpeed() / TUNNEL_SPEED - 1) * 0.4) * padPull();
 
     if (!bossActive && !calmPhase()) {
       // spawn enemies, starting easy and loosening up gradually
@@ -3737,7 +3920,7 @@ function update(dt) {
     }
 
     // pickup timers count down to nothing
-    if (tripleLaserTimer > 0 || shieldTimer > 0 || overdriveTimer > 0) {
+    if (tripleLaserTimer > 0 || shieldTimer > 0 || overdriveTimer > 0 || boostTimer > 0 || brakeTimer > 0) {
       tripleLaserTimer = Math.max(0, tripleLaserTimer - dt);
       shieldTimer = Math.max(0, shieldTimer - dt);
       overdriveTimer = Math.max(0, overdriveTimer - dt);
@@ -4146,6 +4329,7 @@ function draw() {
       ctx.translate((Math.random() - 0.5) * shakeMag * falloff, (Math.random() - 0.5) * shakeMag * falloff);
     }
     drawTunnel();
+    drawTrackItems();
     drawWarp();
     drawNova();
     drawEnemies();
@@ -6114,6 +6298,7 @@ function loop(now) {
   updateCoPlayers(dt);
   updateVersus(dt);
   updateCycles(dt);
+  updateTrack(dt);
   syncRunClass();
   drawPortrait();
   updateClipRecording(dt);
