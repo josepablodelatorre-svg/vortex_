@@ -3,7 +3,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1000, height: 720 } });
-  await p.addInitScript(() => localStorage.setItem('vortex-tutorial', '1')); // skip the first-run tutorial
+  await p.addInitScript(() => { localStorage.setItem('vortex-tutorial', '1'); localStorage.setItem('vortex-flash-warned', '1'); }); // skip the first-run tutorial
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   const ev = (x) => p.evaluate(x);
   const wait = (ms) => p.waitForTimeout(ms);
@@ -45,7 +45,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   // phone look
   const c = await b.newContext({ ...devices['iPhone 13'] });
   const q = await c.newPage();
-  await q.addInitScript(() => localStorage.setItem('vortex-tutorial', '1')); // skip the first-run tutorial
+  await q.addInitScript(() => { localStorage.setItem('vortex-tutorial', '1'); localStorage.setItem('vortex-flash-warned', '1'); }); // skip the first-run tutorial
   await q.goto('http://127.0.0.1:8765/index.html'); await q.waitForTimeout(400);
   await q.evaluate(() => startGame(false)); await q.waitForTimeout(400);
   await q.evaluate('briefingTimer = 0; power = 100; updatePlasmaUI()');

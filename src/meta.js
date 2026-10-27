@@ -44,6 +44,8 @@ document.getElementById('crtToggle').addEventListener('click', (e) => {
 });
 
 function applySettingsUI() {
+  document.getElementById('flashToggle').textContent = 'FLASHING: ' + (settings.flash === 'reduced' ? 'REDUCED' : 'FULL');
+  document.body.classList.toggle('calm', settings.flash === 'reduced');
   document.getElementById('glowToggle').textContent = 'GLOW: ' + settings.glow.toUpperCase();
   document.getElementById('vibeToggle').textContent = 'VIBRATION: ' + (settings.vibrate ? 'ON' : 'OFF');
   document.getElementById('musicVol').value = Math.round(settings.music * 100);
@@ -58,6 +60,25 @@ document.getElementById('glowToggle').addEventListener('click', (e) => {
   applySettingsUI();
   saveSettings();
 });
+document.getElementById('flashToggle').addEventListener('click', (e) => {
+  e.stopPropagation();
+  settings.flash = settings.flash === 'reduced' ? 'full' : 'reduced';
+  applySettingsUI();
+  saveSettings();
+});
+// first launch: the photosensitivity notice, before anything flashes
+function closeFlashWarning(reduce) {
+  if (reduce) settings.flash = 'reduced';
+  saveSettings();
+  try { store.setItem('vortex-flash-warned', '1'); } catch (err) { /* ignore */ }
+  applySettingsUI();
+  document.getElementById('flashwarn').classList.remove('on');
+}
+if (!store.getItem('vortex-flash-warned')) document.getElementById('flashwarn').classList.add('on');
+for (const [id, reduce] of [['warnOk', false], ['warnReduce', true]]) {
+  document.getElementById(id).addEventListener('click', (e) => { e.stopPropagation(); closeFlashWarning(reduce); });
+}
+document.getElementById('flashwarn').addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
 document.getElementById('vibeToggle').addEventListener('click', (e) => {
   e.stopPropagation();
   settings.vibrate = !settings.vibrate;
@@ -467,6 +488,7 @@ function recordRunResult() {
 let shakeTimer = 0;
 let shakeMag = 0;
 function triggerShake(magnitude, duration) {
+  if (settings.flash === 'reduced') magnitude *= 0.35;
   shakeMag = Math.max(shakeMag, magnitude);
   shakeTimer = Math.max(shakeTimer, duration);
 }

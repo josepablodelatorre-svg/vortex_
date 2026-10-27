@@ -213,7 +213,7 @@ function update(dt) {
 
     // damage flash fades quickly
     damageFlash = Math.max(0, damageFlash - dt * 3.2);
-    document.getElementById('damageflash').style.opacity = (damageFlash * 0.6).toFixed(2);
+    document.getElementById('damageflash').style.opacity = (damageFlash * 0.6 * flashScale()).toFixed(2);
 
     // screen shake decays to nothing over `shakeTimer` seconds
     if (shakeTimer > 0) {

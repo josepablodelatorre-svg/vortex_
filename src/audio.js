@@ -4,12 +4,19 @@
 // ---------- Player settings (volume, glow, vibration) ----------
 // glow: 'auto' turns canvas glow (shadowBlur, the costliest effect) off
 // while the frame rate is struggling and back on when it recovers.
-const settings = { music: 1, sfx: 1, glow: 'auto', vibrate: true };
+// flash: 'reduced' tones down strobing, screen-wide flashes, colour
+// inversion, CRT flicker and shake (the photosensitivity option)
+const settings = { music: 1, sfx: 1, glow: 'auto', vibrate: true, flash: 'full' };
 try { Object.assign(settings, JSON.parse(store.getItem('vortex-settings') || '{}')); } catch (e) { /* ignore */ }
 function saveSettings() {
   try { store.setItem('vortex-settings', JSON.stringify(settings)); } catch (e) { /* ignore */ }
 }
 let glowActive = settings.glow !== 'off';
+// how strong screen flashes are drawn: full, or a gentle quarter
+function flashScale() {
+  return settings.flash === 'reduced' ? 0.25 : 1;
+}
+document.body.classList.toggle('calm', settings.flash === 'reduced');
 // every 2D context's shadowBlur goes through this, so glow can be cut in one place
 const nativeBlur = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'shadowBlur');
 Object.defineProperty(CanvasRenderingContext2D.prototype, 'shadowBlur', {
@@ -329,6 +336,44 @@ function sfxOut() {
   return sfxBus;
 }
 
+// bitcrusher + drive: a stepped transfer curve (only 2^bits output levels)
+// after a hard tanh push, for the lo-fi crunch of early samplers; cached
+const crushCurves = {};
+function crusher(bits, drive) {
+  const key = bits + ':' + drive;
+  if (!crushCurves[key]) {
+    const n = 2048, steps = Math.pow(2, bits), curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = Math.tanh(((i / (n - 1)) * 2 - 1) * drive) / Math.tanh(drive);
+      curve[i] = Math.round(x * steps / 2) / (steps / 2);
+    }
+    crushCurves[key] = curve;
+  }
+  const ws = actx.createWaveShaper();
+  ws.curve = crushCurves[key];
+  return ws;
+}
+
+// phaser: four all-pass stages swept from high to low across the sound,
+// mixed back with the dry signal, so the notches whoosh down with it
+function phaser(at, dur, from, to) {
+  const input = actx.createGain();
+  const output = actx.createGain();
+  input.connect(output);
+  let node = input;
+  for (let i = 0; i < 4; i++) {
+    const ap = actx.createBiquadFilter();
+    ap.type = 'allpass';
+    ap.Q.value = 0.8;
+    ap.frequency.setValueAtTime(from * (1 + i * 0.35), at);
+    ap.frequency.exponentialRampToValueAtTime(to * (1 + i * 0.35), at + dur);
+    node.connect(ap);
+    node = ap;
+  }
+  node.connect(output);
+  return { input, output };
+}
+
 function noise() {
   if (!noiseBuffer) {
     noiseBuffer = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
@@ -343,7 +388,8 @@ function noise() {
 // One synth voice. o: wave ('sawtooth' | 'square' | 'triangle' | 'sine' |
 // 'noise'), freq -> freqEnd over glide s, detune: cents for extra detuned
 // copies (a fat unison), attack/decay envelope to vol, an optional filter
-// { type, freq, freqEnd, q } swept over the decay, delay start, echo send.
+// { type, freq, freqEnd, q } swept over the decay, optional crush
+// { bits, drive } and phaser { from, to }, delay start, echo send.
 function voice(o) {
   const at = actx.currentTime + (o.delay || 0);
   const dur = (o.attack || 0.002) + o.decay;
@@ -352,13 +398,23 @@ function voice(o) {
   amp.gain.exponentialRampToValueAtTime(o.vol, at + (o.attack || 0.002));
   amp.gain.exponentialRampToValueAtTime(0.0001, at + dur);
   let head = amp;
+  if (o.crush) {
+    const c = crusher(o.crush.bits, o.crush.drive);
+    c.connect(head);
+    head = c;
+  }
+  if (o.phaser) {
+    const ph = phaser(at, dur, o.phaser.from, o.phaser.to);
+    ph.output.connect(head);
+    head = ph.input;
+  }
   if (o.filter) {
     const f = actx.createBiquadFilter();
     f.type = o.filter.type || 'lowpass';
     f.Q.value = o.filter.q || 1;
     f.frequency.setValueAtTime(o.filter.freq, at);
     if (o.filter.freqEnd) f.frequency.exponentialRampToValueAtTime(o.filter.freqEnd, at + dur);
-    f.connect(amp);
+    f.connect(head);
     head = f;
   }
   amp.connect(sfxOut());
@@ -410,7 +466,11 @@ function fm(o) {
   amp.gain.exponentialRampToValueAtTime(0.0001, at + o.decay);
   mod.connect(modGain);
   modGain.connect(car.frequency);
-  car.connect(amp);
+  if (o.crush) {
+    const c = crusher(o.crush.bits, o.crush.drive);
+    car.connect(c);
+    c.connect(amp);
+  } else car.connect(amp);
   amp.connect(sfxOut());
   if (o.echo) {
     const send = actx.createGain();
@@ -431,27 +491,33 @@ function playBass(freq = 80, dur = 0.25) {
           filter: { freq: 400, q: 1 } });
 }
 
-// player laser: detuned saws diving in pitch through a squelchy filter sweep
+// player laser: a bright square + saw diving fast from high to low (the
+// classic "pew"), through a swept phaser for the sci-fi whoosh, with a
+// resonant filter following it down and a faint echo trailing behind
 function playZap() {
   if (!actx) return;
-  voice({ wave: 'sawtooth', freq: 1250, freqEnd: 260, glide: 0.11, decay: 0.12, vol: 0.13, detune: [-10, 0, 10],
-          filter: { freq: 7000, freqEnd: 500, q: 9 }, echo: 0.15 });
+  voice({ wave: 'square', freq: 2400, freqEnd: 180, glide: 0.14, decay: 0.16, vol: 0.09, detune: [-8, 8],
+          filter: { freq: 9000, freqEnd: 700, q: 6 }, phaser: { from: 5000, to: 300 }, echo: 0.3 });
+  voice({ wave: 'sawtooth', freq: 1800, freqEnd: 120, glide: 0.12, decay: 0.13, vol: 0.06,
+          filter: { freq: 6000, freqEnd: 400, q: 10 }, phaser: { from: 3000, to: 200 } });
 }
 
-// enemy destroyed: an FM metallic snap over a filtered noise crack, like an
-// early drum machine's tom and clap mashed together
+// enemy destroyed: an FM metallic snap over a noise crack, both bitcrushed
+// and overdriven like an early sampler pushed into the red
 function playHit() {
   if (!actx) return;
-  fm({ freq: 330, freqEnd: 70, ratio: 1.41, index: 6, decay: 0.22, vol: 0.2 });
-  voice({ wave: 'noise', decay: 0.12, vol: 0.18, filter: { type: 'bandpass', freq: 3200, freqEnd: 700, q: 2 } });
+  fm({ freq: 330, freqEnd: 70, ratio: 1.41, index: 6, decay: 0.24, vol: 0.18, crush: { bits: 4, drive: 3 } });
+  voice({ wave: 'noise', decay: 0.16, vol: 0.16, filter: { type: 'bandpass', freq: 3200, freqEnd: 600, q: 2 },
+          crush: { bits: 3, drive: 4 } });
 }
 
-// taking damage: a growling detuned saw falling through a closing filter
+// taking damage: a growling detuned saw falling through a closing filter,
+// crushed down to a few bits and driven hard so it rasps
 function playDamage() {
   if (!actx) return;
-  voice({ wave: 'sawtooth', freq: 150, freqEnd: 38, decay: 0.42, vol: 0.17, detune: [-22, 0, 19],
-          filter: { freq: 2200, freqEnd: 120, q: 12 } });
-  voice({ wave: 'noise', decay: 0.18, vol: 0.14, filter: { freq: 1800, freqEnd: 200, q: 1 } });
+  voice({ wave: 'sawtooth', freq: 150, freqEnd: 38, decay: 0.45, vol: 0.16, detune: [-22, 0, 19],
+          filter: { freq: 2600, freqEnd: 140, q: 12 }, crush: { bits: 3, drive: 6 } });
+  voice({ wave: 'noise', decay: 0.22, vol: 0.12, filter: { freq: 2400, freqEnd: 200, q: 1 }, crush: { bits: 2, drive: 5 } });
 }
 
 // pickup: a quick Juno arpeggio up a major chord, chorused and echoed

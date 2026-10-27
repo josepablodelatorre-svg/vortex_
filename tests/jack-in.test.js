@@ -5,7 +5,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const b = await chromium.launch({ args: cam ? ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] : [] });
   const ctxB = await b.newContext({ viewport: { width: 1000, height: 700 }, permissions: cam ? ['camera'] : [] });
   const p = await ctxB.newPage();
-  await p.addInitScript(() => localStorage.setItem('vortex-tutorial', '1')); // skip the first-run tutorial
+  await p.addInitScript(() => { localStorage.setItem('vortex-tutorial', '1'); localStorage.setItem('vortex-flash-warned', '1'); }); // skip the first-run tutorial
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   const ev = (x) => p.evaluate(x);
   await p.goto('http://127.0.0.1:8765/index.html'); await ev('localStorage.clear()'); await p.reload(); await p.waitForTimeout(300);

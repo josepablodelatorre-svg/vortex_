@@ -69,7 +69,7 @@ function draw() {
     if (!shipShattered && viewMode !== 'cockpit') drawShip();
     drawVoxels();
     if (envFlash > 0) {
-      ctx.fillStyle = `rgba(220,240,255,${0.45 * envFlash * envFlash})`;
+      ctx.fillStyle = `rgba(220,240,255,${0.45 * envFlash * envFlash * flashScale()})`;
       ctx.fillRect(-W, -H, W * 3, H * 3);
     }
     ctx.restore();

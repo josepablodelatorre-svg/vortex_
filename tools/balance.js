@@ -113,7 +113,7 @@ function playRun({ skill, difficulty, maxSeconds }) {
   if (!busy) server = await require('../tests/static-server').start();
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 900, height: 640 } });
-  await p.addInitScript(() => localStorage.setItem('vortex-tutorial', '1'));
+  await p.addInitScript(() => { localStorage.setItem('vortex-tutorial', '1'); localStorage.setItem('vortex-flash-warned', '1'); });
   await p.goto('http://127.0.0.1:8765/index.html');
   await p.evaluate('localStorage.clear()');
   await p.reload();

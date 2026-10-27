@@ -3,6 +3,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1000, height: 700 } });
+  await p.addInitScript(() => localStorage.setItem('vortex-flash-warned', '1'));
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   const ev = (x) => p.evaluate(x);
   const until = (expr, ms = 8000) => p.waitForFunction(expr, null, { timeout: ms }).then(() => true).catch(() => false);

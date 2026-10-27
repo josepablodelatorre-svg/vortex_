@@ -6,7 +6,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const b = await chromium.launch();
   const c = await b.newContext({ ...devices['iPhone 13'] });
   const p = await c.newPage();
-  await p.addInitScript(() => localStorage.setItem('vortex-tutorial', '1')); // skip the first-run tutorial
+  await p.addInitScript(() => { localStorage.setItem('vortex-tutorial', '1'); localStorage.setItem('vortex-flash-warned', '1'); }); // skip the first-run tutorial
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   const ev = (x) => p.evaluate(x);
   const fits = () => ev(`document.documentElement.scrollWidth <= innerWidth + 1`);

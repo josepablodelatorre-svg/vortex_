@@ -386,6 +386,14 @@ wrapped so one flag (`glowActive`) zeroes it everywhere, and on AUTO
 own gain node (`sfxOut()`). `vibrate()` buzzes on hits, bombs and boss
 kills (Android; iPhones have no web vibration).
 
+**Flashing / photosensitivity** — first launch shows a photosensitivity
+warning (`#flashwarn`, EN + ES) with REDUCED FLASHING or CONTINUE; it's
+remembered (`vortex-flash-warned`). SETTINGS → FLASHING: FULL / REDUCED
+(`settings.flash`, `flashScale()`). Reduced: the warp fades to grey instead
+of inverting, the hoop trip is a slow gentle colour drift, screen flashes
+(level change, damage, teleport) are a quarter strength, shake is cut to a
+third, and the CRT and title flicker stop (`body.calm`).
+
 **Pause** — P / Esc / the II button under the radar (`pauseGame()` /
 `resumeGame()`); the game also pauses itself on `visibilitychange` and
 window `blur` (phone lock, tab switch). While paused the loop skips every
@@ -459,9 +467,12 @@ heal 45 (of `HULL_MAX = 150`, raised from 100 to make runs last).
   filter sweep, Moog-style) and `fm()` (two-operator FM, DX7-style bells,
   clangs and e-piano blips) feed one effects chain in `sfxOut()`: SFX-slider
   gain → soft analog drive (`makeDriveCurve`) → Juno-style stereo chorus,
-  plus an echo send (`echoBus`, dark feedback delay). Effects: `playZap`
-  (laser), `playBass` (its thump), `playHit` (kill: FM snap + noise crack),
-  `playEnemyShot`, `playDamage` (growl), `playPowerUp` (chorused arpeggio),
+  plus an echo send (`echoBus`, dark feedback delay). Voices can also run
+  through `crusher(bits, drive)` (a stepped, overdriven waveshaper: lo-fi
+  bitcrush) and `phaser()` (four swept all-pass stages). Effects: `playZap`
+  (laser: a fast high-to-low dive through a swept phaser, faint echo), `playBass` (its thump), `playHit` (kill: FM snap + noise crack,
+  bitcrushed),
+  `playEnemyShot`, `playDamage` (crushed, driven growl), `playPowerUp` (chorused arpeggio),
   `playBossHit` (FM clang + sub), `playComms`, `playHack`, and `playCoin`:
   each coin of a run plays the next note up a pentatonic scale
   (`COIN_SCALE`), so a row of five rings out as a rising arpeggio.

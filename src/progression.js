@@ -99,9 +99,14 @@ function updateTrack(dt) {
   // white ink (easing in and out) wins over the psychedelic hue trip
   if (inkTimer > 0) {
     const k = Math.min(1, inkTimer / 0.6, (INK_TIME - inkTimer) / 0.3);
-    canvas.style.filter = `grayscale(${k}) invert(${k}) contrast(${1 + k})`;
+    // reduced flashing: a soft fade to grey instead of the inverted ink
+    canvas.style.filter = settings.flash === 'reduced' ? `grayscale(${k * 0.85})` : `grayscale(${k}) invert(${k}) contrast(${1 + k})`;
+  } else if (tripTimer > 0) {
+    canvas.style.filter = settings.flash === 'reduced'
+      ? `hue-rotate(${Math.round(t * 40) % 360}deg) saturate(1.25)`
+      : `hue-rotate(${Math.round(t * 400) % 360}deg) saturate(1.8)`;
   } else {
-    canvas.style.filter = tripTimer > 0 ? `hue-rotate(${Math.round(t * 400) % 360}deg) saturate(1.8)` : '';
+    canvas.style.filter = '';
   }
   if (state !== 'playing') return;
   if (!calmPhase()) {
@@ -281,7 +286,7 @@ function drawTrackItems() {
   }
   ctx.restore();
   if (teleportFlash > 0) {
-    ctx.fillStyle = `rgba(200,120,255,${0.25 * teleportFlash})`;
+    ctx.fillStyle = `rgba(200,120,255,${0.25 * teleportFlash * flashScale()})`;
     ctx.fillRect(0, 0, W, H);
   }
 }
