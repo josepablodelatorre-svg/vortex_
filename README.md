@@ -582,7 +582,7 @@ updated by `recordRunResult()` (called from both `endGame()` and
 `winGame()`, so a win and a loss both count). Shown on the title screen
 (`#besttag`) as "BEST n   FURTHEST: RUN n" once a run has been played.
 
-**Branding** — NEMO INC. logo + wordmark shown only on the title screen
+**Branding** — Nemo Inc logo + wordmark shown only on the title screen
 (`#titlebrand`), embedded as base64 PNG with real transparency (the first
 version used a JPEG with a black background and a `mix-blend-mode:
 screen` hack — replaced once a proper transparent PNG was supplied).

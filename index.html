@@ -41,7 +41,7 @@
     <p id="tagline">INFINITE SPACE. INFINITE WAR.</p>
     <p id="besttag"></p>
     <p id="presshint">PRESS START</p>
-    <div id="titlebrand"><img src="img/nemo-logo.png" alt="NEMO Inc."><span>NEMO INC.</span></div>
+    <div id="titlebrand"><img src="img/nemo-logo.png" alt="Nemo Inc"><span>NEMO INC</span></div>
   </section>
   <section class="screen" data-screen="menu">
     <h2>MAIN MENU</h2>
@@ -142,7 +142,31 @@
       <label><span>MUSIC</span><input type="range" id="musicVol" min="0" max="100" step="5" value="100"></label>
       <label><span>SFX</span><input type="range" id="sfxVol" min="0" max="100" step="5" value="100"></label>
     </div>
+    <div id="settingslinks"><button data-go="backup">SAVE BACKUP &gt;</button><button data-go="credits">CREDITS &gt;</button></div>
     <button class="back" data-go="menu">&lt; BACK</button>
+  </section>
+  <section class="screen" data-screen="backup">
+    <h2>SAVE BACKUP</h2>
+    <p class="menunote">YOUR PROGRESS LIVES IN THIS BROWSER ONLY. COPY THIS CODE (OR SAVE THE FILE) TO KEEP IT OR MOVE IT TO ANOTHER DEVICE.</p>
+    <textarea id="backupcode" readonly spellcheck="false"></textarea>
+    <div class="backupbtns"><button id="backupCopy">COPY CODE</button><button id="backupFile">SAVE FILE</button></div>
+    <p class="menunote">TO LOAD A BACKUP, PASTE ITS CODE HERE OR OPEN THE FILE:</p>
+    <textarea id="restorecode" spellcheck="false" placeholder="PASTE A VTX1: CODE"></textarea>
+    <div class="backupbtns"><button id="restoreBtn">LOAD CODE</button><button id="restoreFileBtn">OPEN FILE</button><input type="file" id="restoreFile" accept=".txt,.json,text/plain,application/json" hidden></div>
+    <p id="backupmsg"></p>
+    <button class="back" data-go="settings">&lt; BACK</button>
+  </section>
+  <section class="screen" data-screen="credits">
+    <h2>CREDITS</h2>
+    <div id="creditlist">
+      <p><b>VORTEX</b> <span id="versiontag"></span></p>
+      <p><em>GAME + ORIGINAL SOUNDTRACK</em><br>NEMO INC</p>
+      <p><em>MUSIC</em><br>GARDEN / DESTRUCTION / CUERPO ACIDO / NOCHE RANDOM</p>
+      <p><em>BUILT WITH</em><br>CLAUDE BY ANTHROPIC, STARTED AT THE PLATZI MEXICO CLAUDE FOR GAMES BUILD DAY</p>
+      <p><em>OPEN SOURCE</em><br>PEERJS (MIT) / QRCODE-GENERATOR BY KAZUHIKO ARASE (MIT) / PRESS START 2P FONT BY CODEMAN38 (SIL OFL)<br><a href="lib/LICENSES.txt" target="_blank" rel="noopener">LICENSES</a> &nbsp; <a href="fonts/OFL.txt" target="_blank" rel="noopener">FONT LICENSE</a></p>
+      <p><a href="privacy.html" target="_blank" rel="noopener">PRIVACY POLICY</a></p>
+    </div>
+    <button class="back" data-go="settings">&lt; BACK</button>
   </section>
 </div>
 <div id="flashwarn">

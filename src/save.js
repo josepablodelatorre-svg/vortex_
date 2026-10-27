@@ -8,6 +8,7 @@
 // On load, any of those old separate keys are folded in once and removed.
 // store.getItem / setItem / removeItem mirror localStorage's API (string
 // values), so the rest of the code reads like before.
+const GAME_VERSION = '0.9.0'; // shown in CREDITS; bump with each release
 const SAVE_KEY = 'vortex-save';
 const SAVE_VERSION = 1;
 const store = (() => {
@@ -49,7 +50,15 @@ const store = (() => {
     setItem(k, v) { save.data[k] = String(v); write(); },
     removeItem(k) { delete save.data[k]; write(); },
     version() { return save.v; },
-    dump() { return JSON.stringify(save); }
+    dump() { return JSON.stringify(save); },
+    // replace everything with a backup (already parsed); false if it isn't one
+    restore(sv) {
+      if (!sv || typeof sv !== 'object' || !sv.data || typeof sv.data !== 'object') return false;
+      for (const k in sv.data) if (typeof sv.data[k] !== 'string') return false;
+      save = migrate({ v: sv.v || 1, data: sv.data });
+      write();
+      return true;
+    }
   };
 })();
 

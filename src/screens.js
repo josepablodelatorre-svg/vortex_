@@ -20,6 +20,8 @@ function showScreen(name) {
   if (name === 'shop') renderShop();
   if (name === 'missions') renderMissions();
   if (name === 'board') renderBoard();
+  if (name === 'credits') document.getElementById('versiontag').textContent = 'V' + GAME_VERSION;
+  if (name === 'backup') openBackup();
   const doneCount = missionState.active.filter(m => m.p >= m.n).length;
   document.getElementById('missionsBtn').textContent = 'MISSIONS (' + doneCount + '/3) >';
   document.getElementById('shopBtn').textContent = 'UPGRADES (' + coins + ' C) >';
@@ -60,6 +62,82 @@ document.getElementById('playBtn').addEventListener('click', (e) => {
   startGame(false, 'campaign');
 });
 // back to the menu from a results screen
+// ---- save backup: the whole save as a copyable code or a file ----
+// A code is 'VTX1:' + base64 of the save's JSON; restoring replaces all
+// progress (after a confirming second tap) and reloads the game.
+function backupCode() {
+  return 'VTX1:' + btoa(unescape(encodeURIComponent(store.dump())));
+}
+function parseBackup(text) {
+  text = (text || '').trim();
+  try {
+    if (text.startsWith('VTX1:')) return JSON.parse(decodeURIComponent(escape(atob(text.slice(5).replace(/\s+/g, '')))));
+    return JSON.parse(text); // a saved file can also be the plain JSON
+  } catch (e) { return null; }
+}
+let restoreArmed = null; // the parsed backup waiting for its confirming tap
+function backupMsg(text) { document.getElementById('backupmsg').textContent = text; }
+function openBackup() {
+  document.getElementById('backupcode').value = backupCode();
+  document.getElementById('restorecode').value = '';
+  document.getElementById('restoreBtn').textContent = 'LOAD CODE';
+  restoreArmed = null;
+  backupMsg('');
+}
+function tryRestore(text) {
+  const sv = parseBackup(text);
+  if (!sv || !sv.data) { backupMsg("THAT DOESN'T LOOK LIKE A VORTEX BACKUP."); return; }
+  if (restoreArmed !== text) {
+    restoreArmed = text;
+    document.getElementById('restoreBtn').textContent = 'TAP AGAIN TO REPLACE';
+    backupMsg('THIS REPLACES ALL PROGRESS ON THIS DEVICE.');
+    return;
+  }
+  if (!store.restore(sv)) { backupMsg("THAT DOESN'T LOOK LIKE A VORTEX BACKUP."); return; }
+  backupMsg('BACKUP LOADED. RESTARTING...');
+  setTimeout(() => location.reload(), 600);
+}
+document.getElementById('backupCopy').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const box = document.getElementById('backupcode');
+  box.select();
+  const done = () => backupMsg('CODE COPIED. KEEP IT SOMEWHERE SAFE.');
+  if (navigator.clipboard) navigator.clipboard.writeText(box.value).then(done, () => { document.execCommand('copy'); done(); });
+  else { document.execCommand('copy'); done(); }
+});
+document.getElementById('backupFile').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([backupCode()], { type: 'text/plain' }));
+  a.download = 'vortex-save-' + todayKey() + '.txt';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  backupMsg('BACKUP FILE SAVED.');
+});
+document.getElementById('restoreBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  tryRestore(document.getElementById('restorecode').value);
+});
+document.getElementById('restoreFileBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('restoreFile').click();
+});
+document.getElementById('restoreFile').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  file.text().then(text => {
+    document.getElementById('restorecode').value = text.trim();
+    restoreArmed = null;
+    tryRestore(text.trim());
+  });
+  e.target.value = '';
+});
+for (const id of ['backupcode', 'restorecode']) {
+  const el = document.getElementById(id);
+  for (const ev of ['click', 'mousedown', 'touchstart', 'keydown']) el.addEventListener(ev, (e) => e.stopPropagation(), { passive: true });
+}
+
 // ---- first-run tutorial ----
 // The first campaign run starts with a short guided warm-up on level 1: one
 // instruction at a time, each waiting for the pilot to actually do it (no
