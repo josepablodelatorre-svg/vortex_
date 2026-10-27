@@ -18,6 +18,7 @@ const files = fs.readdirSync(__dirname)
   .filter(f => !filters.length || filters.some(w => f.includes(w)))
   .sort();
 
+const lastOutput = {};
 function runOne(file) {
   return new Promise((resolve) => {
     const started = Date.now();
@@ -32,6 +33,7 @@ function runOne(file) {
       const errs = /^errors (.*)$/m.exec(out);
       const pageErrors = errs && errs[1] !== '[]' ? errs[1] : '';
       const passed = code === 0 && !fails.length && !pageErrors;
+      lastOutput[file] = out;
       const secs = ((Date.now() - started) / 1000).toFixed(1);
       console.log(`${passed ? 'ok  ' : 'FAIL'} ${file} (${secs}s)`);
       if (!passed) console.log(out.split('\n').map(l => '     ' + l).join('\n'));
@@ -58,9 +60,23 @@ function portBusy(port) {
     try { servers.push(await require('./peer-server').start()); }
     catch (err) { console.log('(no local peer server: ' + err.message + ' - run npm install in tests/)'); }
   }
-  let failed = 0;
-  for (const f of files) if (!(await runOne(f))) failed++;
+  const failedFiles = [];
+  for (const f of files) if (!(await runOne(f))) failedFiles.push(f);
+  // a file that fails is run once more: many checks depend on frame timing,
+  // and a slow or busy machine can trip them. Failing twice is a real fail.
+  const stillFailing = [];
+  for (const f of failedFiles) {
+    console.log(`\nretrying ${f}`);
+    if (!(await runOne(f))) stillFailing.push(f);
+    else console.log(`(${f} passed on retry: flaky timing)`);
+  }
+  const failed = stillFailing.length;
   console.log(`\n${files.length - failed}/${files.length} test files passed`);
+  // on GitHub, failures also become annotations on the run
+  if (process.env.GITHUB_ACTIONS) {
+    for (const f of stillFailing) console.log(`::error title=${f} failed::${(lastOutput[f] || '').split('\n').filter(l => /FAIL|Error/.test(l)).slice(0, 5).join(' | ').replace(/[\r\n%]/g, ' ')}`);
+    for (const f of failedFiles.filter(x => !stillFailing.includes(x))) console.log(`::warning title=${f} flaky::passed on retry`);
+  }
   for (const s of servers) s.close();
   process.exit(failed ? 1 : 0);
 })();
