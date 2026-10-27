@@ -2067,8 +2067,8 @@ function lockIn() {
   playPowerUp();
   playBass(55, 0.5);
   shipCallout('LOCK-IN!', '#ffe14d');
-  say('lockin', { en: ['LOCK WINGS IN ATTACK POSITION!', 'WINGS LOCKED! THE WHOLE RING IS YOURS!'],
-                  es: ['¡ALAS EN POSICION DE ATAQUE!', '¡ALAS FIJAS! ¡TODO EL ANILLO ES TUYO!'] }, 3, 0);
+  say('lockin', { en: ['LOCK BLASTERS IN ATTACK POSITION!', 'BLASTERS LOCKED! THE WHOLE RING IS YOURS!'],
+                  es: ['¡BLASTERS EN POSICION DE ATAQUE!', '¡BLASTERS FIJOS! ¡TODO EL ANILLO ES TUYO!'] }, 3, 0);
 }
 
 function updateLockIn(dt) {
@@ -2790,7 +2790,7 @@ function routeEnv() {
 const ENV_LINES = {
   space: { en: ['WE ARE OUT! ENJOY THE VIEW, PILOT.', 'OPEN SPACE. CATCH YOUR BREATH.'], es: ['¡SALIMOS! DISFRUTA LA VISTA, PILOTO.', 'ESPACIO ABIERTO. RECUPERA EL ALIENTO.'] },
   trench: { en: ['TRENCH RUN. HOLD YOUR LINE... HOLD YOUR LINE!', 'STAY IN THE TRENCH, PILOT. THE VENT IS AT THE END.'], es: ['CORRIDA EN LA ZANJA. MANTEN TU LINEA... ¡MANTENLA!', 'QUEDATE EN LA ZANJA, PILOTO. EL CONDUCTO ESTA AL FINAL.'] },
-  asteroid: { en: ['ROCKS AHEAD! DON\'T QUOTE ME THE ODDS!', 'ASTEROID FIELD. SHOOT THROUGH OR SLIDE AROUND.'], es: ['¡ROCAS ADELANTE! ¡NO ME DIGAS LAS PROBABILIDADES!', 'CAMPO DE ASTEROIDES. DISPARA O ESQUIVA.'] },
+  asteroid: { en: ['ROCKS AHEAD! YOU KNOW I DON\'T BELIEVE IN THE ODDS.', 'ASTEROID FIELD. SHOOT THROUGH OR SLIDE AROUND.'], es: ['¡ROCAS ADELANTE! YA SABES QUE NO CREO EN LAS PROBABILIDADES.', 'CAMPO DE ASTEROIDES. DISPARA O ESQUIVA.'] },
   surface: { en: ['ATMOSPHERE ENTRY. KEEP IT LOW.', 'PLANETFALL. STAY OVER THE VALLEY.'], es: ['ENTRADA ATMOSFERICA. VUELA BAJO.', 'ATERRIZAJE PLANETARIO. MANTENTE EN EL VALLE.'] },
   tube: { en: ['BACK IN THE PIPE.', 'INTO THE VORTEX AGAIN.'], es: ['DE VUELTA EN EL TUBO.', 'OTRA VEZ AL VORTICE.'] }
 };
@@ -3962,11 +3962,16 @@ function commsWatch() {
     return;
   }
   if (hull / hullMax < 0.25) {
-    hack('lowhullHack', { en: 'YOUR HULL IS FAILING, PILOT. HOW FITTING.', es: 'TU CASCO ESTA FALLANDO, PILOTO. QUE APROPIADO.' }, 3, 40);
+    hack('lowhullHack', { en: 'YOUR HULL IS FAILING, PILOT. THE ODDS ARE AGAINST YOU.', es: 'TU CASCO ESTA FALLANDO, PILOTO. LAS PROBABILIDADES ESTAN EN TU CONTRA.' }, 3, 40);
   }
   if (hull / hullMax < 0.35) {
     say('lowhull', ['HULL CRITICAL! FIND A REPAIR!', "YOU'RE BREAKING UP, PILOT! GRAB A REPAIR!"], 3, 18);
   }
+  // the pilot's answer when it's really bad: said last so it gets the line
+  if (hull / hullMax < 0.18) {
+    say('odds', { en: 'YOU KNOW I DON\'T BELIEVE IN THE ODDS.', es: 'YA SABES QUE NO CREO EN LAS PROBABILIDADES.' }, 3, 45);
+  }
+
   if (enemies.length >= 6 && zapperCharges > 0) {
     say('zaphint', ['SWARM DETECTED! HIT SPACE FOR THE ZAPPER!', 'TOO MANY OF THEM! USE THE ZAPPER!'], 2, 25);
   }
