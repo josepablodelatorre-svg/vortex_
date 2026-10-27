@@ -34,6 +34,8 @@ port it is reused. Screenshots land in `tests/shots/` (not committed).
 | `flashing` | photosensitivity warning, reduced flashing effects, settings toggle |
 | `install` | manifest + icons, service worker caching, loads and plays offline |
 | `leaderboard` | top-10 boards per mode, results tag, board screen, saved |
+| `gamepad` | fake controller: menus, aiming, auto-fire, bomb, pause |
+| `backup` | credits, save code copy/file, restore from code and file |
 | `pause` | P / Esc / button, auto-pause when hidden, MENU, no pause in versus |
 | `ship-classes` | class choice, hulls, bombs, warp spikes, gunner + interceptor perks |
 | `powerups` | shield, nova, ship movement, bullseye lock, pickup mix |

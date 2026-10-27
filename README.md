@@ -32,7 +32,8 @@ src/             — the game, as plain scripts loaded in this order:
   update.js        update(dt), the per-frame simulation
   draw.js          all canvas rendering
   multiplayer.js   co-op, versus, Daemons (PeerJS)
-  screens.js       start screens, tutorial, pause
+  screens.js       start screens, tutorial, pause, save backup
+  gamepad.js       game controllers (Gamepad API)
   main.js          the requestAnimationFrame loop
 pad.html         — the phone controller for co-op
 lib/             — PeerJS + qrcode-generator (MIT, see LICENSES.txt)
@@ -409,6 +410,19 @@ reconnects with the same id so the QR code stays valid
 five tries), ignoring events from connections it has replaced. For a
 public launch, run our own PeerJS server (and a TURN server for phones
 behind strict networks) and point `peerOptions()` at it.
+
+**Controllers** — `src/gamepad.js` polls the Gamepad API every frame
+(`pollGamepad()` from the loop), standard mapping (Xbox / PlayStation /
+most pads). In play: either stick aims, A or RT fires (held = auto-fire,
+`PAD_FIRE_EVERY`, or the interceptor's own rate), X or LT bombs, Y or RB
+lock-in, START pauses. Everywhere else (title screens, pause, results,
+the photosensitivity notice) the d-pad / left stick moves a highlight
+between buttons (`padTargets()`, `.padfocus`, shown once a pad is used),
+A presses, B is back, left/right nudge a slider.
+
+**Save backup** — SETTINGS → SAVE BACKUP shows the whole save as a code
+(`VTX1:` + base64 of the save JSON) to copy or download as a file; pasting
+a code or opening a file restores it (second tap confirms, then reload).
 
 **Leaderboard** — top 10 per mode on this device (`boards`, saved as
 `vortex-leaderboard`): CAMPAIGN, RIFT and DAILY (today's tunnel only).

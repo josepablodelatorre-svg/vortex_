@@ -21,6 +21,7 @@ function loop(now) {
   const dt = Math.min(0.05, rawDt);
   lastTime = now;
   if (state === 'playing' && !paused) watchFrameRate(rawDt);
+  pollGamepad(dt);
   if (paused) {
     // the world holds still behind the overlay; nothing ticks
     if (state !== 'playing') resumeGame();

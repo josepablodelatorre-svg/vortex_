@@ -1228,3 +1228,5 @@ body.paused #pause { display: flex; }
 }
 /* notes on the backup screen sit in normal flow, not tucked under a heading */
 [data-screen="backup"] .menunote { margin: 8px 0 4px !important; line-height: 1.8; text-align: center; }
+/* controller focus: the button a gamepad has selected */
+body.padmode .padfocus { outline: 2px solid #ffe14d !important; outline-offset: 3px; box-shadow: 0 0 16px rgba(255, 225, 77, 0.6) !important; }
