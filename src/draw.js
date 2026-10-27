@@ -138,7 +138,7 @@ function drawRadar(cxIn, cyIn, rIn, inDash) {
   ctx.fillStyle = 'rgba(63,255,102,0.7)';
   ctx.font = "7px 'Press Start 2P', 'Courier New', monospace";
   ctx.textAlign = 'center';
-  if (!inDash) ctx.fillText('RADAR', cx, cy + R + 11);
+  if (!inDash) ctx.fillText(T('RADAR'), cx, cy + R + 11);
   ctx.restore();
 }
 
@@ -1008,7 +1008,7 @@ function drawHitLabels() {
     ctx.shadowColor = hl.color || '#fff';
     ctx.shadowBlur = 8;
     ctx.font = `${hl.size || 10}px 'Press Start 2P', 'Courier New', monospace`;
-    ctx.fillText(hl.text || 'HIT!', hl.x, hl.y);
+    ctx.fillText(T(hl.text || 'HIT!'), hl.x, hl.y);
   }
   ctx.globalAlpha = 1;
   ctx.restore();
@@ -1238,7 +1238,7 @@ function drawLockBrackets(x, y, r) {
   ctx.font = "9px 'Press Start 2P', 'Courier New', monospace";
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ff3355';
-  ctx.fillText('LOCK', 0, -r - 8);
+  ctx.fillText(T('LOCK'), 0, -r - 8);
   ctx.restore();
 }
 

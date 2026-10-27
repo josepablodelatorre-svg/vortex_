@@ -19,7 +19,8 @@ applyCrtState();
 // commander + briefing language (HUD and banners stay in arcade English)
 try { if (store.getItem('vortex-lang') === 'es') lang = 'es'; } catch (e) { /* ignore */ }
 function applyLang() {
-  document.getElementById('langToggle').textContent = 'COMMS: ' + lang.toUpperCase();
+  document.getElementById('langToggle').textContent = 'LANGUAGE: ' + lang.toUpperCase();
+  applyUiLang();
   document.getElementById('viewToggle').textContent = 'VIEW: ' + viewMode.toUpperCase();
 }
 applyLang();

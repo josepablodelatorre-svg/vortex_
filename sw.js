@@ -9,7 +9,7 @@ const SHELL = [
   './', 'index.html', 'pad.html', 'privacy.html', 'style.css', 'manifest.webmanifest',
   'img/nemo-logo.png', 'img/icons/icon-192.png', 'img/icons/icon-512.png', 'fonts/press-start-2p.woff2',
   'lib/peerjs.min.js', 'lib/qrcode.js',
-  'src/save.js', 'src/audio.js', 'src/progression.js', 'src/world.js', 'src/environments.js',
+  'src/save.js', 'src/i18n.js', 'src/audio.js', 'src/progression.js', 'src/world.js', 'src/environments.js',
   'src/input.js', 'src/meta.js', 'src/flow.js', 'src/pilot.js', 'src/update.js',
   'src/draw.js', 'src/multiplayer.js', 'src/screens.js', 'src/online.js', 'src/gamepad.js', 'src/main.js'
 ];

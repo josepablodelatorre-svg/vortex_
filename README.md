@@ -19,6 +19,7 @@ index.html       — the page: HUD, title screens, overlays (markup only)
 style.css        — all styles
 src/             — the game, as plain scripts loaded in this order:
   save.js          the one versioned save entry (store), flickering title
+  i18n.js          Spanish for the interface (T(), UI_ES)
   audio.js         settings (volume, glow, vibration), SFX, music, analyser
   progression.js   game state, track items, coins, missions, checkpoints,
                    the Rift, level objectives
@@ -413,6 +414,15 @@ reconnects with the same id so the QR code stays valid
 five tries), ignoring events from connections it has replaced. For a
 public launch, run our own PeerJS server (and a TURN server for phones
 behind strict networks) and point `peerOptions()` at it.
+
+**Language** — SETTINGS → LANGUAGE: EN / ES switches the commander,
+briefings and now the whole interface (`src/i18n.js`). The code writes
+English; with Spanish on, `T()` translates any text that reaches the page
+(exact matches in `UI_ES`, then `UI_ES_PATTERNS` for texts with numbers
+or names, then piece by piece), applied by a MutationObserver
+(`applyUiLang()`), and canvas labels call `T()` directly. Switching back
+restores the English. Spanish is in the arcade style the commander uses:
+capitals without accents, Ñ ¡ ¿ kept.
 
 **Controllers** — `src/gamepad.js` polls the Gamepad API every frame
 (`pollGamepad()` from the loop), standard mapping (Xbox / PlayStation /

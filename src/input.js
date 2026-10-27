@@ -136,9 +136,9 @@ function drawCockpit() {
   ctx.font = font(9);
   ctx.fillStyle = '#c9a0ff';
   ctx.textAlign = 'left';
-  ctx.fillText('SC ' + score, L.vx0 + 4, L.top / 2);
+  ctx.fillText(T('SCORE') + ' ' + score, L.vx0 + 4, L.top / 2);
   ctx.textAlign = 'right';
-  ctx.fillText((gameMode === 'rift' ? 'DEPTH ' + riftDepth : 'LVL ' + currentLevel), L.vx1 - 4, L.top / 2);
+  ctx.fillText((gameMode === 'rift' ? T('DEPTH') + ' ' + riftDepth : T('LVL') + ' ' + currentLevel), L.vx1 - 4, L.top / 2);
 
   // speed ladder (left): ticks stream past with the tunnel, a marker shows speed
   const lx = L.m + 4, lw = L.side - 10, ly0 = L.vy0 + 10, ly1 = L.vy1 - 10;
@@ -157,7 +157,7 @@ function drawCockpit() {
   ctx.font = font(7);
   ctx.textAlign = 'center';
   ctx.fillStyle = '#c9a0ff';
-  ctx.fillText('SPD', lx + lw / 2, ly1 + 10);
+  ctx.fillText(T('SPD'), lx + lw / 2, ly1 + 10);
 
   // hull + plasma cells (right): hull from the bottom, plasma cells on top
   const cells = 10, rx = L.vx1 + 8, rw = L.side - 10;
@@ -174,7 +174,7 @@ function drawCockpit() {
     ctx.fillRect(rx, y, rw, ch - 4);
   }
   ctx.fillStyle = '#c9a0ff';
-  ctx.fillText('HP', rx + rw / 2, ly1 + 10);
+  ctx.fillText(T('HP'), rx + rw / 2, ly1 + 10);
 
   // compass strip under the glass: hazard stripes and the heading
   const sy = L.vy1 + 4, sh = L.strip - 4;
@@ -247,14 +247,14 @@ function drawCockpit() {
   ctx.fillStyle = blink ? 'rgba(255, 225, 77, 0.35)' : statusColor;
   ctx.shadowColor = statusColor;
   ctx.shadowBlur = target || lockinTimer > 0 ? 10 : 0;
-  ctx.fillText(status, L.m + lw0 / 2, dy0 + dh * 0.26 + 1);
+  ctx.fillText(T(status), L.m + lw0 / 2, dy0 + dh * 0.26 + 1);
   ctx.shadowBlur = 0;
   panel(L.m, dy0 + dh * 0.58, lw0, dh * 0.42);
   ctx.font = font(9);
   ctx.textAlign = 'left';
   ctx.fillStyle = '#c9a0ff';
   const py = dy0 + dh * 0.79;
-  ctx.fillText('PWR', L.m + 10, py + 1);
+  ctx.fillText(T('PWR'), L.m + 10, py + 1);
   const cellsX = L.m + (small ? 42 : 52), cellW = (lw0 - (cellsX - L.m) - 12) / 5;
   for (let i = 0; i < 5; i++) {
     const lit = power >= (i + 1) * 20;
@@ -276,7 +276,7 @@ function drawCockpit() {
   ctx.strokeRect(rcx - mw / 2 + 0.5, dy1 - 17.5, mw - 1, 15);
   ctx.fillStyle = '#e8d6ff';
   ctx.textAlign = 'center';
-  ctx.fillText(mode, rcx, dy1 - 9);
+  ctx.fillText(T(mode), rcx, dy1 - 9);
 
   // sector map: the level's objective as a 4x4 grid filling up; the last
   // cell is the boss and flashes once it's out
