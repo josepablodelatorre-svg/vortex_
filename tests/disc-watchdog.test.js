@@ -8,7 +8,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const wait = (ms) => p.waitForTimeout(ms);
   await p.goto('http://127.0.0.1:8765/index.html'); await ev('localStorage.clear()'); await p.reload(); await wait(300);
   await ((await p.evaluate("state === 'title'")) ? p.evaluate('startGame(false)') : p.mouse.click(500, 680)); await wait(200);
-  await ev('briefingTimer = 0; hull = hullMax; enemies = []');
+  await ev('briefingTimer = 0; hull = hullMax; enemies = []; spawnTimer = 99'); // no fresh spawns mid-sweep
   // enemies spread all around the ring at the sweep depth
   await ev(`for (let i = 0; i < 6; i++) { spawnEnemy(-Math.PI + i * Math.PI / 3 + 0.2, 'drone'); enemies.at(-1).z = 0.5; enemies.at(-1).speed = 0; }`);
   await ev(`collectPowerup({angle: 0, z: 0.02, alive: true, kind: 'disc'})`);
