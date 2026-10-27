@@ -220,6 +220,17 @@ racing along them toward the horizon (more often as `musicSwell` rises,
 faster in a warp). `drawAimTrail()` draws the last 0.5s of the aim's path
 as a light-cycle ribbon around the tunnel.
 
+**Jack in (from Tron)** — title-screen name field (`#pilotname`, saved as
+`vortex-pilot`) + `#jackinBtn`. `jackIn()` asks for the camera (optional;
+refusal or no camera falls back to a procedural mask), then runs the
+`'jackin'` state: `updateJackIn()` draws a red laser sweeping down the
+full-screen `#digitize` canvas, revealing the player as a Rutt-Etra
+wireframe (`drawRuttFace()`: scan lines lifted by brightness from a
+64×48 mirrored sample in `sampleFace()`), then starts a campaign run.
+While playing, `drawPortrait()` shows the live wireframe in `#portrait`
+(red glitch when hit). The camera image never leaves the device. The
+commander's lines swap PILOT/PILOTO for the name.
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups
