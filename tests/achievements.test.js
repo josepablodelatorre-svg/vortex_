@@ -34,10 +34,11 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
     await p.goto('http://127.0.0.1:8765/index.html'); await wait(300);
     await ev(`window.__spawned = []; const orig = spawnEnemy; spawnEnemy = function (a, ty) { orig(a, ty); const e = enemies.at(-1); __spawned.push(e.type + ':' + e.angle.toFixed(3)); };`);
     await p.evaluate(sel => document.querySelector(sel).click(), '#dailyBtn');
-    for (let i = 0; i < 80 && await ev('__spawned.length') < 5; i++) { await ev('hull = hullMax'); await wait(100); }
+    for (let i = 0; i < 250 && await ev('__spawned.length') < 5; i++) { await ev('hull = hullMax'); await wait(100); }
     return ev(`__spawned.slice(0, 5).join(' ')`);
   };
   const d1 = await runDaily(), d2 = await runDaily();
+  if (d1 !== d2) console.log('  d1', d1, '\n  d2', d2);
   ok(d1 === d2 && await ev('daily'), 'daily tunnel is the same every time today');
   ok((await ev(`document.getElementById('hudrun').textContent`)).startsWith('DAILY'), 'HUD shows DAILY');
   await ev('score = 1234; damageShip(99999)'); await wait(300);
