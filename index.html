@@ -1932,7 +1932,6 @@ function dealMissions() {
   missionState.active = pool.map(m => ({ id: m.id, n: m.max ? Math.min(LEVEL_COUNT, m.n + Math.floor(missionState.set / 2)) : Math.ceil(m.n * scale), p: 0 }));
   saveMissions();
 }
-if (!missionState.active || missionState.active.length !== 3) dealMissions();
 
 function missionText(m) {
   return MISSION_POOL.find(x => x.id === m.id).text.replace('{n}', m.n);
@@ -7003,6 +7002,10 @@ function backToMenu() {
 function syncRunClass() {
   document.body.classList.toggle('inrun', state === 'playing' || state === 'gameover' || state === 'cleared');
 }
+
+// a first visit (or a broken save) gets its first three missions; this
+// runs here because dealing them needs LEVEL_COUNT, declared further up
+if (!missionState.active || missionState.active.length !== 3) dealMissions();
 
 // daily tunnel, clip and share buttons (wired last: they use the sections above)
 updateDailyBtn();
