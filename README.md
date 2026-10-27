@@ -350,6 +350,14 @@ run tier, score and the mission progress. CONTINUE on SIGNAL LOST
 (`#contFromLost`) and in the menu (`#continueBtn`) call
 `continueFromCheckpoint()`. Beating the campaign clears it.
 
+**Cockpit view** — SETTINGS → VIEW: CHASE / COCKPIT (`viewMode`, saved as
+`vortex-view`). In cockpit the ship isn't drawn; the world is rotated by
+`viewRot` (`COCKPIT_TURN` × the ship lane's offset from the bottom, < 1 so
+aim and lane settle) and `drawCockpit()` overlays a canopy frame, struts
+and a dashboard with HULL/PLASMA dials, a POWER bar and console lights,
+all jolting on hits. `updateAimFromPointer()` adds `viewRot` back so aiming
+stays where you point.
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups
