@@ -1524,6 +1524,10 @@ let trackItems = [];   // { kind, angle, z }
 let trackTimer = 6;
 let boostTimer = 0, brakeTimer = 0, tripTimer = 0;
 let teleportFlash = 0;
+// warp ink: hitting warp speed drains the colour and inverts the screen, so
+// the speed lines turn into black ink strokes on white, for INK_TIME
+const INK_TIME = 7;
+let inkTimer = 0;
 
 // speed multipliers from pads: tunnel scroll, and how hard enemies are pulled in
 function padSpeed() {
@@ -1579,8 +1583,15 @@ function updateTrack(dt) {
   brakeTimer = Math.max(0, brakeTimer - dt);
   tripTimer = Math.max(0, tripTimer - dt);
   teleportFlash = Math.max(0, teleportFlash - dt * 3);
-  // the psychedelic hue trip is a CSS filter on the canvas
-  canvas.style.filter = tripTimer > 0 ? `hue-rotate(${Math.round(t * 400) % 360}deg) saturate(1.8)` : '';
+  inkTimer = Math.max(0, inkTimer - dt);
+  // screen-wide looks are CSS filters on the canvas: the warp's black-and-
+  // white ink (easing in and out) wins over the psychedelic hue trip
+  if (inkTimer > 0) {
+    const k = Math.min(1, inkTimer / 0.6, (INK_TIME - inkTimer) / 0.3);
+    canvas.style.filter = `grayscale(${k}) invert(${k}) contrast(${1 + k})`;
+  } else {
+    canvas.style.filter = tripTimer > 0 ? `hue-rotate(${Math.round(t * 400) % 360}deg) saturate(1.8)` : '';
+  }
   if (state !== 'playing') return;
   if (!calmPhase()) {
     trackTimer -= dt;
@@ -1592,6 +1603,24 @@ function updateTrack(dt) {
   const speed = effectiveTunnelSpeed() * warpBoost() * padSpeed();
   for (const it of trackItems) {
     it.z -= speed * dt;
+    if (it.kind === 'vent' && !it.done) {
+      for (const b of bolts) {
+        if (b.hidden || Math.abs(normalizeAngle(b.angle - it.angle)) > 0.3 || Math.abs(b.z - it.z) > 0.12) continue;
+        it.done = true;
+        b.z = 2;
+        score += 500;
+        document.getElementById('score').textContent = score;
+        shatterAt(it.angle, it.z, '255,160,60', 90, 2);
+        triggerShake(16, 0.5);
+        playBossHit();
+        shipCallout('DIRECT HIT! +500', '#ffaa3c');
+        say('vent', { en: ['DIRECT HIT! GREAT SHOT, KID. DON\'T LET IT GO TO YOUR HEAD.', 'THAT\'S A HIT! THE WHOLE TRENCH IS GOING UP!'],
+                      es: ['¡IMPACTO DIRECTO! BUEN TIRO, CHICO. QUE NO SE TE SUBA.', '¡LE DIMOS! ¡TODA LA ZANJA VUELA!'] }, 3, 0);
+        break;
+      }
+      if (!it.done && it.z <= 0.03) { it.done = true; shipCallout('VENT MISSED', '#ff8866'); }
+      continue;
+    }
     if (it.z <= 0.03 && !it.done) {
       it.done = true;
       if (inShipLane(it.angle, TRACK_HIT)) triggerTrackItem(it);
@@ -1612,6 +1641,27 @@ function drawTrackItems() {
   for (const it of trackItems) {
     if (it.z < 0 || it.z > 1) continue;
     const near = 1 - it.z;
+    if (it.kind === 'vent') {
+      if (it.done) continue;
+      // a glowing exhaust vent set into the trench floor, with a target ring
+      const quad = wallPatch(it.angle, 0.12, it.z, 0.07);
+      ctx.beginPath();
+      quad.forEach((pt, i) => i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
+      ctx.closePath();
+      ctx.fillStyle = `rgba(255,150,40,${0.3 + 0.3 * Math.sin(t * 10)})`;
+      ctx.fill();
+      ctx.strokeStyle = '#ffaa3c';
+      ctx.shadowColor = '#ffaa3c';
+      ctx.shadowBlur = 16;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      const c = pointOnRing(it.angle, it.z + 0.035);
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 6 + 18 * near, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      continue;
+    }
     if (it.kind === 'boost' || it.kind === 'brake') {
       const quad = wallPatch(it.angle, 0.17, it.z, 0.09);
       ctx.beginPath();
@@ -1801,7 +1851,7 @@ let nextMinibossIndex = 0; // resets to 0 each level, alongside killCount
 
 // The run is split into levels, each unlocking tougher enemy variety and
 // ending in its own boss fight once that level's kill target is reached.
-const LEVEL_COUNT = 3;
+const LEVEL_COUNT = 5;
 let currentLevel = 1;
 let levelBannerTimer = 0;
 
@@ -2001,6 +2051,7 @@ function enterRiftSector() {
   document.getElementById('levelnum').textContent = riftDepth;
   updateRunUI();
   showLevelBanner(riftDepth === 1 ? (versus ? 'VERSUS' : 'THE RIFT') : 'DEPTH ' + riftDepth);
+  setEnv(routeEnv(), riftDepth === 1);
   if (riftDepth >= 5) unlockAchievement('riftwalker');
 }
 
@@ -2395,6 +2446,206 @@ function ringRadius(z) {
 
 // Vortex swirl: the tunnel geometry itself slowly twists, faster with depth and
 // faster as the run goes on, like being pulled toward an event horizon.
+// ---------- Environments + routes ----------
+// The lane gameplay never changes; the world around it does. Each campaign
+// level is a route of environments, switched as the mission progresses;
+// the Rift cycles through all of them by depth. The numeric look of each
+// environment (envK) eases toward its target so transitions blend.
+//   swirl/bend: how much the vortex twists and the path curves
+//   sx/sy/rot:  the cross-section's stretch and rotation (trench = wide box)
+//   rough:      rocky ring noise (asteroids)
+//   tunnel:     how visible the tube itself is (0 in open space / on a planet)
+const ENV = {
+  tube:     { swirl: 1,   bend: 1,   sx: 1,   sy: 1,    rot: 0,           rough: 0, tunnel: 1, spawn: 1,   name: 'TUNNEL' },
+  trench:   { swirl: 0,   bend: 0,   sx: 1.3, sy: 0.85, rot: Math.PI / 4, rough: 0, tunnel: 1, spawn: 0.9, name: 'TRENCH RUN' },
+  asteroid: { swirl: 0.4, bend: 1,   sx: 1,   sy: 1,    rot: 0,           rough: 1, tunnel: 1, spawn: 1,   name: 'ASTEROID FIELD' },
+  space:    { swirl: 0.3, bend: 0.4, sx: 1,   sy: 1,    rot: 0,           rough: 0, tunnel: 0, spawn: 1.7, name: 'OPEN SPACE' },
+  surface:  { swirl: 0,   bend: 0.3, sx: 1,   sy: 1,    rot: 0,           rough: 0, tunnel: 0, spawn: 1.15, name: 'PLANET SURFACE' }
+};
+const LEVEL_ROUTES = [
+  ['tube', 'space', 'tube'],
+  ['trench', 'asteroid'],
+  ['space'],                       // a whole level out in the open: the breather
+  ['surface', 'tube'],
+  ['asteroid', 'trench', 'tube']
+];
+const RIFT_ENVS = ['tube', 'trench', 'asteroid', 'space', 'surface'];
+let env = 'tube';
+const envK = { ...ENV.tube };
+let envFlash = 0;
+
+function routeEnv() {
+  if (gameMode === 'rift') return RIFT_ENVS[(riftDepth - 1) % RIFT_ENVS.length];
+  const route = LEVEL_ROUTES[(currentLevel - 1) % LEVEL_ROUTES.length];
+  return route[Math.min(route.length - 1, Math.floor(missionProgress() * route.length))];
+}
+
+const ENV_LINES = {
+  space: { en: ['WE ARE OUT! ENJOY THE VIEW, PILOT.', 'OPEN SPACE. CATCH YOUR BREATH.'], es: ['¡SALIMOS! DISFRUTA LA VISTA, PILOTO.', 'ESPACIO ABIERTO. RECUPERA EL ALIENTO.'] },
+  trench: { en: ['TRENCH RUN. HOLD YOUR LINE... HOLD YOUR LINE!', 'STAY IN THE TRENCH, PILOT. THE VENT IS AT THE END.'], es: ['CORRIDA EN LA ZANJA. MANTEN TU LINEA... ¡MANTENLA!', 'QUEDATE EN LA ZANJA, PILOTO. EL CONDUCTO ESTA AL FINAL.'] },
+  asteroid: { en: ['ROCKS AHEAD! DON\'T QUOTE ME THE ODDS!', 'ASTEROID FIELD. SHOOT THROUGH OR SLIDE AROUND.'], es: ['¡ROCAS ADELANTE! ¡NO ME DIGAS LAS PROBABILIDADES!', 'CAMPO DE ASTEROIDES. DISPARA O ESQUIVA.'] },
+  surface: { en: ['ATMOSPHERE ENTRY. KEEP IT LOW.', 'PLANETFALL. STAY OVER THE VALLEY.'], es: ['ENTRADA ATMOSFERICA. VUELA BAJO.', 'ATERRIZAJE PLANETARIO. MANTENTE EN EL VALLE.'] },
+  tube: { en: ['BACK IN THE PIPE.', 'INTO THE VORTEX AGAIN.'], es: ['DE VUELTA EN EL TUBO.', 'OTRA VEZ AL VORTICE.'] }
+};
+
+function setEnv(name, quiet) {
+  if (name === env) return;
+  const leaving = env;
+  env = name;
+  envFlash = quiet ? 0 : 1;
+  tunnelSidesTarget = name === 'trench' ? 4 : (gameMode === 'rift' ? pickRiftShape() : computeShapeStage());
+  if (leaving === 'trench' && !quiet) spawnVent();
+  if (!quiet) {
+    showLevelBanner(ENV[name].name);
+    say('env-' + name, ENV_LINES[name], 2, 20);
+  }
+}
+
+function updateEnv(dt) {
+  const target = ENV[env];
+  const k = Math.min(1, dt * 1.4);
+  for (const key of ['swirl', 'bend', 'sx', 'sy', 'rot', 'rough', 'tunnel']) envK[key] += (target[key] - envK[key]) * k;
+  envFlash = Math.max(0, envFlash - dt * 1.5);
+  if (state === 'playing' && !calmPhase()) setEnv(routeEnv());
+}
+
+// the trench ends at a vent: one clean hit for a big bonus
+function spawnVent() {
+  trackItems.push({ kind: 'vent', angle: normalizeAngle(Math.PI + (Math.random() - 0.5) * 0.8), z: 1 });
+}
+
+// ---- cheap 2D value noise for terrain and rocks ----
+function hash2(x, y) {
+  const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  return h - Math.floor(h);
+}
+function noise2(x, y) {
+  const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  const a = hash2(ix, iy), b = hash2(ix + 1, iy), c = hash2(ix, iy + 1), d = hash2(ix + 1, iy + 1);
+  return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+}
+
+// ---- open space: streaming stars, a distant galaxy, and the black hole ----
+const SPACE_STARS = Array.from({ length: 170 }, () => ({ a: Math.random() * Math.PI * 2, d: Math.random(), s: 0.5 + Math.random() }));
+function drawSpace(alpha) {
+  if (alpha <= 0.01) return;
+  const far = pointOnRing(0, 1);
+  const maxR = Math.hypot(W, H) * 0.6;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  // a faint spiral galaxy off to one side
+  ctx.save();
+  ctx.translate(W * 0.2, H * 0.24);
+  ctx.rotate(t * 0.03);
+  for (let i = 0; i < 260; i++) {
+    const arm = i % 2, k = i / 260;
+    const a = arm * Math.PI + k * 9, r = k * Math.min(W, H) * 0.16;
+    ctx.fillStyle = `rgba(${180 + arm * 60},${150 + k * 80},255,${0.5 * (1 - k)})`;
+    ctx.fillRect(Math.cos(a) * r, Math.sin(a) * r * 0.45, 2, 2);
+  }
+  ctx.restore();
+  // stars streaming outward from the vanishing point
+  ctx.lineCap = 'round';
+  const speed = 0.25 * padSpeed() * warpBoost();
+  for (const st of SPACE_STARS) {
+    st.d += speed * (0.15 + st.d) * st.s * 0.016;
+    if (st.d > 1) { st.d = 0.02; st.a = Math.random() * Math.PI * 2; }
+    const r0 = st.d * maxR, r1 = r0 * (1 - 0.06 * st.s);
+    ctx.strokeStyle = `rgba(220,230,255,${Math.min(1, st.d * 1.6)})`;
+    ctx.lineWidth = 1 + st.d * 1.5;
+    ctx.beginPath();
+    ctx.moveTo(far.x + Math.cos(st.a) * r1, far.y + Math.sin(st.a) * r1);
+    ctx.lineTo(far.x + Math.cos(st.a) * r0, far.y + Math.sin(st.a) * r0);
+    ctx.stroke();
+  }
+  // the black hole at the vanishing point: accretion disc, photon ring, void
+  const R = Math.min(W, H) * 0.05;
+  ctx.save();
+  ctx.translate(far.x, far.y);
+  ctx.globalCompositeOperation = 'lighter';
+  for (let k = 0; k < 4; k++) {
+    ctx.beginPath();
+    ctx.ellipse(0, 0, R * (3.2 - k * 0.45), R * (0.62 - k * 0.08), -0.25, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,${140 + k * 25},60,${0.35 + k * 0.12})`;
+    ctx.lineWidth = 2 + k;
+    ctx.shadowColor = '#ff9a3c';
+    ctx.shadowBlur = 18;
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.arc(0, 0, R * 1.12, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,240,210,0.9)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.arc(far.x, far.y, R, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// ---- planet surface: a sun (or moon) over scrolling wireframe mountains ----
+const SKY_STARS = Array.from({ length: 90 }, () => ({ x: Math.random(), y: Math.random() * 0.5, b: Math.random() }));
+function drawSurface(alpha) {
+  if (alpha <= 0.01) return;
+  // even Rift depths and later campaign runs get the cold moonlit version
+  const moon = gameMode === 'rift' ? riftDepth % 2 === 0 : runTier % 2 === 1;
+  const lineRGB = moon ? '225,235,255' : '255,120,60';
+  const horizon = CY;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  for (const st of SKY_STARS) {
+    ctx.fillStyle = `rgba(255,255,230,${0.3 + 0.6 * st.b * (0.6 + 0.4 * Math.sin(t * 2 + st.x * 40))})`;
+    ctx.fillRect(st.x * W, st.y * H, 2, 2);
+  }
+  const sr = Math.min(W, H) * 0.12;
+  const sx = CX + W * 0.22, sy = horizon - H * 0.2;
+  const grad = ctx.createRadialGradient(sx, sy, sr * 0.2, sx, sy, sr);
+  grad.addColorStop(0, moon ? '#ffffff' : '#ffd36b');
+  grad.addColorStop(1, moon ? 'rgba(170,190,220,0.85)' : 'rgba(255,140,30,0.9)');
+  ctx.fillStyle = grad;
+  ctx.shadowColor = moon ? '#cfe2ff' : '#ff9a2c';
+  ctx.shadowBlur = 50;
+  ctx.beginPath();
+  ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  // the terrain: rows rolling toward the player, mountains rising toward the
+  // sides so the middle stays a flyable valley
+  const ROWS = 22, COLS = 34;
+  const scroll = tunnelTravel * 4;
+  const frac = scroll % 1, base = Math.floor(scroll);
+  const pts = [];
+  for (let k = 0; k <= ROWS; k++) {
+    const zz = Math.max(0, (k + 1 - frac) / (ROWS + 1)); // 1 = horizon, 0 = at the player
+    const near = Math.pow(1 - zz, 2.2);
+    const row = [];
+    for (let c = 0; c <= COLS; c++) {
+      const u = (c / COLS) * 3.4 - 1.7;
+      const mount = Math.min(1, Math.max(0, (Math.abs(u) - 0.3) / 1.0));
+      const h = noise2(u * 2.2, (k + base) * 0.35) * mount * mount;
+      row.push([CX + u * W * (0.05 + near * 0.95), horizon + (H - horizon) * near - h * H * 0.42 * (0.25 + near * 0.75)]);
+    }
+    pts.push({ row, zz });
+  }
+  ctx.lineWidth = 1;
+  for (const { row, zz } of pts) {
+    ctx.strokeStyle = `rgba(${lineRGB},${0.15 + 0.6 * (1 - zz)})`;
+    ctx.beginPath();
+    row.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.stroke();
+  }
+  for (let c = 0; c <= COLS; c++) {
+    ctx.strokeStyle = `rgba(${lineRGB},0.35)`;
+    ctx.beginPath();
+    pts.forEach(({ row }, i) => (i ? ctx.lineTo(row[c][0], row[c][1]) : ctx.moveTo(row[c][0], row[c][1])));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function swirlAngle(z) {
   // zero at z=0 so the near wall (and the player's aim) never drifts,
   // growing with depth and with run time so the far tunnel spirals harder
@@ -2415,16 +2666,16 @@ function polygonRadiusFactor(angle, sides) {
 
 function pointOnRing(angle, z, opts) {
   const visual = !opts || opts.visual !== false;
-  const swirl = visual ? swirlAngle(z) : 0;
-  const r = ringRadius(z) * polygonRadiusFactor(angle + swirl, tunnelSides);
+  const swirl = visual ? swirlAngle(z) * envK.swirl : 0;
+  const r = ringRadius(z) * polygonRadiusFactor(angle + swirl + (visual ? envK.rot : 0), tunnelSides);
   // camera path bend: distant geometry shows where the path is heading,
   // near geometry (z=0) always resolves to zero offset, same as the player
-  const dx = visual ? (pathX(t + z * PATH_LOOKAHEAD) - pathX(t)) : 0;
-  const dy = visual ? (pathY(t + z * PATH_LOOKAHEAD) - pathY(t)) : 0;
+  const dx = visual ? (pathX(t + z * PATH_LOOKAHEAD) - pathX(t)) * envK.bend : 0;
+  const dy = visual ? (pathY(t + z * PATH_LOOKAHEAD) - pathY(t)) * envK.bend : 0;
   const a = angle + swirl - Math.PI / 2;
   return {
-    x: CX + Math.cos(a) * r + dx * z,
-    y: CY + Math.sin(a) * r + dy * z,
+    x: CX + Math.cos(a) * r * (visual ? envK.sx : 1) + dx * z,
+    y: CY + Math.sin(a) * r * (visual ? envK.sy : 1) + dy * z,
     r
   };
 }
@@ -2994,6 +3245,8 @@ function startGame(continuing, mode) {
   if (mode === undefined) mode = state === 'gameover' ? gameMode : 'campaign';
   if (daily || versus) seedDaily();
   runT = 0;
+  env = 'tube';
+  Object.assign(envK, ENV.tube);
   // results screens back to their normal wording
   document.getElementById('wontitle').textContent = 'SIGNAL SECURED';
   document.getElementById('wonhint').textContent = 'CLICK TO PUSH DEEPER';
@@ -3020,7 +3273,7 @@ function startGame(continuing, mode) {
   lockinBlend = 0;
   trackItems = [];
   trackTimer = 6;
-  boostTimer = 0; brakeTimer = 0; tripTimer = 0;
+  boostTimer = 0; brakeTimer = 0; tripTimer = 0; inkTimer = 0;
   lockinAnnounced = false;
   shipLane = Math.PI;
   shipLaneVel = 0;
@@ -3169,6 +3422,7 @@ let lastTime = performance.now();
 
 function pickEnemyType() {
   if (gameMode === 'rift' && riftMix) {
+    if (env === 'asteroid' && rng('enemy') < 0.3) return 'rock';
     let roll = rng('enemy') * (riftMix.drone + riftMix.weaver + riftMix.shooter + riftMix.pentagram);
     for (const type of ['drone', 'weaver', 'shooter', 'pentagram']) {
       roll -= riftMix[type];
@@ -3177,6 +3431,10 @@ function pickEnemyType() {
     return 'drone';
   }
   const roll = rng('enemy');
+  // the environment tilts the mix: trenches are lined with turrets
+  // (shooters), asteroid fields are full of tumbling rocks
+  if (env === 'trench' && roll < 0.45) return 'shooter';
+  if (env === 'asteroid' && roll < 0.35) return 'rock';
   if (currentLevel === 1) return 'drone';
   if (currentLevel === 2) return roll < 0.65 ? 'drone' : 'weaver';
   // level 3+: the galaxy's getting pulled apart out here, and something
@@ -3192,11 +3450,11 @@ function spawnEnemy(angleOverride, typeOverride) {
   const type = typeOverride || pickEnemyType();
   const angle = angleOverride !== undefined ? angleOverride : rng('enemy') * Math.PI * 2;
   const droneShapes = ['tri', 'hex', 'ring'];
-  const shape = type === 'shooter' ? 'square' : type === 'weaver' ? 'squid'
+  const shape = type === 'shooter' ? 'square' : type === 'weaver' ? 'squid' : type === 'rock' ? 'rock'
     : type === 'pentagram' ? 'pentagram'
     : droneShapes[Math.floor(rng('enemy') * droneShapes.length)];
   // shooters hang back and fire instead; pentagrams are slow, deliberate, unstoppable-feeling
-  const speedMul = type === 'shooter' ? 0.65 : type === 'pentagram' ? 0.8 : 1;
+  const speedMul = type === 'shooter' ? 0.65 : type === 'pentagram' ? 0.8 : type === 'rock' ? 0.7 : 1;
   const e = {
     angle, z: 1.0, shape, type, alive: true,
     baseAngle: angle, phase: rng('enemy') * Math.PI * 2,
@@ -3204,6 +3462,7 @@ function spawnEnemy(angleOverride, typeOverride) {
   };
   if (type === 'shooter') e.fireTimer = 1.6 + rng('enemy') * 1.4;
   if (type === 'pentagram') e.hp = 2; // takes two hits, a real threat to clear
+  if (type === 'rock') e.hp = 3;      // asteroids take a few hits to break
   enemies.push(e);
 }
 
@@ -3589,6 +3848,10 @@ function shipCallout(text, color) {
 // superzapper and applies the ship class's level-start perks.
 function onLevelStart() {
   zapperCharges = 1;
+  setEnv(routeEnv(), true);
+  // the level banner names where this level starts
+  const lb = document.getElementById('levelbanner');
+  if (lb.textContent && !lb.textContent.includes(' - ') && lb.textContent !== ENV[env].name) lb.textContent += ' - ' + ENV[env].name;
   levelShots = 0;
   levelHits = 0;
   coresLost = 0;
@@ -3634,6 +3897,7 @@ function startWarp(banner) {
   enemyBolts = [];
   showLevelBanner('WARP');
   triggerShake(8, 0.4);
+  inkTimer = INK_TIME;
   spikeWarned = false;
   say('warp', ['WELL DONE, PILOT! PUNCH IT!', 'BOSS DOWN! HOLD ON, WE ARE JUMPING!', 'OUTSTANDING! WARP NOW!'], 3, 0);
 }
@@ -3832,7 +4096,8 @@ function update(dt) {
       if (spawnTimer <= 0) {
         spawnEnemy();
         spawnTimer = Math.max(diffParams.spawnMin, diffParams.spawnBase - runT * diffParams.spawnDecay)
-          * (missionType === 'survive' ? 0.55 : 1); // survive missions are a denser swarm
+          * (missionType === 'survive' ? 0.55 : 1) // survive missions are a denser swarm
+          * ENV[env].spawn;                          // open space is a breather
       }
 
       // clusters of enemies, once the run has eased the player in
@@ -3857,7 +4122,7 @@ function update(dt) {
     if (!calmPhase()) powerupTimer -= dt;
     if (powerupTimer <= 0) {
       spawnPowerup();
-      powerupTimer = bossActive ? (4.5 + rng('powerup') * 3.5) : (8 + rng('powerup') * 6);
+      powerupTimer = (bossActive ? (4.5 + rng('powerup') * 3.5) : (8 + rng('powerup') * 6)) * (env === 'space' ? 0.55 : 1);
     }
 
     // move enemies toward player (z -> 0), pulled in a little faster as the vortex accelerates
@@ -4370,6 +4635,9 @@ function draw() {
       const falloff = shakeTimer; // fades out as the timer runs down
       ctx.translate((Math.random() - 0.5) * shakeMag * falloff, (Math.random() - 0.5) * shakeMag * falloff);
     }
+    // open environments draw their own world where the tube fades out
+    drawSpace(env === 'space' ? 1 - envK.tunnel : 0);
+    drawSurface(env === 'surface' ? 1 - envK.tunnel : 0);
     drawTunnel();
     drawTrackItems();
     drawWarp();
@@ -4390,6 +4658,10 @@ function draw() {
     drawCoPlayers();
     if (!shipShattered) drawShip();
     drawVoxels();
+    if (envFlash > 0) {
+      ctx.fillStyle = `rgba(220,240,255,${0.45 * envFlash * envFlash})`;
+      ctx.fillRect(-W, -H, W * 3, H * 3);
+    }
     ctx.restore();
     if (state === 'playing') drawRadar();
   }
@@ -4460,6 +4732,14 @@ function drawRadar() {
 }
 
 function drawTunnel() {
+  if (envK.tunnel < 0.02) return;
+  ctx.save();
+  ctx.globalAlpha = envK.tunnel;
+  drawTunnelInner();
+  ctx.restore();
+}
+
+function drawTunnelInner() {
   // radial spokes, sampled along z so they bend through the camera's turns
   // and twist with the vortex swirl instead of staying ruler straight
   const SPOKE_STEPS = 10;
@@ -4488,7 +4768,9 @@ function drawTunnel() {
     if (z > 1 || z < 0) continue;
     // this ring's own centre (it shifts with the path bend), for pushing outward
     let c = null;
-    if (rutt) {
+    const rough = envK.rough > 0.02;
+    const ringId = i - Math.floor(tunnelTravel / RING_SPACING);
+    if (rutt || rough) {
       const top = pointOnRing(0, z), bottom = pointOnRing(Math.PI, z);
       c = { x: (top.x + bottom.x) / 2, y: (top.y + bottom.y) / 2 };
     }
@@ -4499,6 +4781,15 @@ function drawTunnel() {
       if (rutt) {
         // push the point away from the ring's centre, scaled to its size
         const d = ruttDisplacement(angle, z) * pt.r * 0.22;
+        const dx = pt.x - c.x, dy = pt.y - c.y;
+        const len = Math.hypot(dx, dy) || 1;
+        pt.x += dx / len * d;
+        pt.y += dy / len * d;
+      }
+      if (rough) {
+        // asteroid walls: lumpy rock, stable per ring as it scrolls
+        const n = noise2(angle * 2.2, ringId * 0.7) - 0.5;
+        const d = n * pt.r * 0.28 * envK.rough;
         const dx = pt.x - c.x, dy = pt.y - c.y;
         const len = Math.hypot(dx, dy) || 1;
         pt.x += dx / len * d;
@@ -4577,7 +4868,8 @@ const ENEMY_COLORS = {
   shooter:   { rgb: '60,190,255', hex: '#3cbeff' },
   grid:      { rgb: '220,255,60', hex: '#dcff3c' },
   pentagram: { rgb: '255,20,50',  hex: '#ff1432' },
-  intruder:  { rgb: '255,60,220', hex: '#ff3cdc' } // sent by a versus opponent
+  intruder:  { rgb: '255,60,220', hex: '#ff3cdc' }, // sent by a versus opponent
+  rock:      { rgb: '200,150,100', hex: '#c8966a' }
 };
 
 function drawEnemies() {
@@ -4591,6 +4883,7 @@ function drawEnemies() {
     // the classics, pentagrams turn slow and deliberate like they're not in
     // any hurry, everyone else tumbles
     const spin = e.type === 'shooter' ? e.angle : e.type === 'grid' || e.type === 'weaver' ? 0
+      : e.type === 'rock' ? t * 0.6 + e.phase
       : e.type === 'pentagram' ? t * 0.4 + e.angle
       : t * 1.5 + e.angle;
     ctx.save();
@@ -4631,6 +4924,14 @@ function drawEnemies() {
         const px = x * size * 0.75, py = y * size * 0.75;
         if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
       });
+      ctx.closePath();
+    } else if (e.shape === 'rock') {
+      // a lumpy asteroid, its outline fixed per rock (seeded by its phase)
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2;
+        const rr = size * (0.85 + 0.45 * hash2(e.phase * 10, i));
+        if (i === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      }
       ctx.closePath();
     } else if (e.shape === 'squid') {
       // the weaver: an alien jellyfish (a dome with trailing tentacles), so
@@ -6096,6 +6397,8 @@ function cyNewRound() {
 }
 
 function cyStartLocal() {
+  env = 'tube';
+  Object.assign(envK, ENV.tube);
   cyRoundOver = false;
   cyEndTimer = 0;
   cyTickTimer = 0.9; // a beat before the riders launch
@@ -6494,6 +6797,7 @@ function loop(now) {
   updateVersus(dt);
   updateCycles(dt);
   updateTrack(dt);
+  updateEnv(dt);
   syncRunClass();
   drawPortrait();
   updateClipRecording(dt);

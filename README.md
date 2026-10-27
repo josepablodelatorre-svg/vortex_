@@ -305,6 +305,26 @@ A locked boss gets corner brackets (`drawLockBrackets()`) instead of a
 bullseye over it. Weavers are alien jellyfish (`squid` shape), so nothing
 hostile resembles the player's interceptors.
 
+**Environments + routes** — `ENV` defines five looks (tube, trench,
+asteroid, space, surface) as numbers `envK` eases toward: vortex swirl,
+path bend, cross-section stretch/rotation (the trench is a wide flat-
+floored box), rocky ring noise, and how visible the tube is. They only
+change drawing (`pointOnRing` visual mode); hit tests are untouched.
+`LEVEL_ROUTES` gives each of the 5 campaign levels (`LEVEL_COUNT = 5`) a
+route, switched by mission progress (`routeEnv()` / `setEnv()`, with a
+banner, a flash and a commander line); level 3 is all open space, a
+breather (`ENV.space.spawn` = fewer enemies, faster pickups). The Rift
+cycles `RIFT_ENVS` by depth. `drawSpace()` = streaming stars, a spiral
+galaxy and a black hole at the vanishing point; `drawSurface()` = sky,
+sun (or moon) and scrolling wireframe mountains (`noise2()`) with a flat
+valley down the middle. Trenches favour shooters (wall turrets) and end
+with a `vent` track item you must shoot (+500); asteroid fields add `rock`
+enemies (3 hp).
+
+**Warp ink** — `startWarp()` sets `inkTimer = INK_TIME` (7s): a CSS
+grayscale + invert + contrast filter on the canvas turns everything into
+black ink on white, easing in and out (it overrides the hoop hue trip).
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups
