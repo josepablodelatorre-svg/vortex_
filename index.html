@@ -55,6 +55,7 @@
   }
   #hudtriple {
     display: none;
+    white-space: pre-line;
     font-size: 10px;
     color: #fff6c8;
     text-shadow: 0 0 6px #ffffff;
@@ -698,9 +699,9 @@ let t = 0;
 
 // Hull integrity: the ship takes damage from enemy contact rather than
 // dying outright, SIGNAL LOST only fires once hull hits zero.
-const HULL_MAX = 100;
+const HULL_MAX = 150; // raised from 100: runs were ending too early
 const HULL_DAMAGE_PER_HIT = 16;
-const HULL_REPAIR_PER_POWERUP = 32;
+const HULL_REPAIR_PER_POWERUP = 45;
 let hull = HULL_MAX;
 let damageFlash = 0; // 0..1, decays each frame
 
@@ -714,7 +715,15 @@ function updateHullUI() {
 // Shared damage path for anything that hurts the ship: enemy contact,
 // enemy bolts, boss contact. Keeps the flash/sound/lose-check in one place.
 function damageShip(amount) {
+  if (shieldTimer > 0) {
+    // the shield eats the hit completely: a flash and a ping, no hull loss
+    triggerShake(4, 0.12);
+    playBossHit();
+    hitLabels.push({ x: CX + shipX, y: H - Math.min(W, H) * 0.2, vy: -40, life: 0.5, maxLife: 0.5, text: 'BLOCKED', color: '#50e6ff' });
+    return;
+  }
   hull -= amount;
+  shipHitWobble = 1;
   updateHullUI();
   playDamage();
   damageFlash = 1;
@@ -1007,6 +1016,16 @@ let enemyBolts = []; // { angle, z }
 let powerups = []; // { angle, z, alive, kind: 'hull' | 'star' }
 let powerupTimer = 0;
 let tripleLaserTimer = 0; // seconds remaining on an active triple-laser pickup
+let shieldTimer = 0;      // seconds of full damage immunity left (shield pickup)
+let overdriveTimer = 0;   // seconds of automatic rapid fire left (overdrive pickup)
+let autoFireTimer = 0;    // countdown to overdrive's next automatic shot
+let novaFlash = 0;        // 1..0, the screen-clearing nova shockwave animation
+
+// ship motion (purely cosmetic: shots always leave from the tunnel's centre)
+let shipX = 0;            // horizontal offset from centre, eases toward the aim
+let shipVX = 0;
+let shipRecoil = 0;       // 1..0 kick back on each shot
+let shipHitWobble = 0;    // 1..0 shudder after taking damage
 
 // Particles for hit bursts
 let particles = []; // { x, y, vx, vy, life }
@@ -1104,6 +1123,7 @@ function fire() {
     bolts.push({ angle: aimAngle, z: 0.04 });
   }
   pulses.push({ startTime: t, angle: aimAngle });
+  shipRecoil = 1;
   playZap();
   playBass(70 + Math.random() * 20, 0.2);
 }
@@ -1293,6 +1313,14 @@ function startGame(continuing, mode) {
   document.getElementById('levelnum').textContent = currentLevel;
   document.getElementById('levellabel').textContent = gameMode === 'rift' ? 'DEPTH' : 'LVL';
   tripleLaserTimer = 0;
+  shieldTimer = 0;
+  overdriveTimer = 0;
+  autoFireTimer = 0;
+  novaFlash = 0;
+  shipX = 0;
+  shipVX = 0;
+  shipRecoil = 0;
+  shipHitWobble = 0;
   updateHullUI();
   updateBossUI();
   updateRunUI();
@@ -1309,7 +1337,7 @@ function startGame(continuing, mode) {
   spawnTimer = 0;
   clusterTimer = 8 + Math.random() * 6;
   formationTimer = 14 + Math.random() * 6;
-  powerupTimer = 10 + Math.random() * 6;
+  powerupTimer = 6 + Math.random() * 4;
   difficulty = 1;
   state = 'playing';
   document.getElementById('title').style.display = 'none';
@@ -1422,18 +1450,57 @@ function spawnFormation() {
 
 // How long a star pickup's triple-laser spread lasts.
 const TRIPLE_LASER_DURATION = 9;
+const SHIELD_DURATION = 8;
+const OVERDRIVE_DURATION = 7;
+const OVERDRIVE_FIRE_INTERVAL = 0.11; // ~9 shots a second, aimed wherever the pointer is
+
+// Nova: every enemy and enemy bolt on screen is wiped out at once. Kills
+// count and score as normal; the boss only gets its incoming fire cleared.
+function triggerNova() {
+  novaFlash = 1;
+  triggerShake(18, 0.4);
+  playBossHit();
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    e.alive = false;
+    score += Math.round((e.type === 'pentagram' ? 30 : 10) * (gameMode === 'rift' ? riftMultiplier() : 1));
+    killCount += 1;
+    burst(e.angle, e.z, { color: '255,120,255', bitColor: '#ff78ff', label: 'NOVA!', labelColor: '#ffb3ff' });
+  }
+  enemies = [];
+  enemyBolts = [];
+  document.getElementById('score').textContent = score;
+  document.getElementById('kills').textContent = killCount;
+}
 
 function spawnPowerup() {
   const angle = Math.random() * Math.PI * 2;
-  // the star is the rarer, sporadic one — a Mario-style power moment
-  const kind = Math.random() < 0.78 ? 'hull' : 'star';
+  // hull repair is still the most common; the star is a Mario-style power
+  // moment; shield, overdrive and the screen-clearing nova are the rarer extras
+  const roll = Math.random();
+  const kind = roll < 0.45 ? 'hull'
+    : roll < 0.63 ? 'star'
+    : roll < 0.78 ? 'shield'
+    : roll < 0.91 ? 'overdrive'
+    : 'nova';
   powerups.push({ angle, z: 1.0, alive: true, kind });
 }
 
 function collectPowerup(p) {
   p.alive = false;
   playPowerUp();
-  if (p.kind === 'star') {
+  if (p.kind === 'shield') {
+    shieldTimer = SHIELD_DURATION;
+    updateTripleUI();
+    burst(p.angle, p.z, { color: '80,230,255', bitColor: '#50e6ff', label: 'SHIELD!', labelColor: '#b8f6ff' });
+  } else if (p.kind === 'overdrive') {
+    overdriveTimer = OVERDRIVE_DURATION;
+    autoFireTimer = 0;
+    updateTripleUI();
+    burst(p.angle, p.z, { color: '255,140,40', bitColor: '#ff8c28', label: 'OVERDRIVE!', labelColor: '#ffc080' });
+  } else if (p.kind === 'nova') {
+    triggerNova();
+  } else if (p.kind === 'star') {
     tripleLaserTimer = TRIPLE_LASER_DURATION;
     updateTripleUI();
     burst(p.angle, p.z, {
@@ -1455,13 +1522,14 @@ function collectPowerup(p) {
 }
 
 function updateTripleUI() {
+  // one line per active pickup timer
   const el = document.getElementById('hudtriple');
-  if (tripleLaserTimer > 0) {
-    el.textContent = 'TRIPLE LASER ' + tripleLaserTimer.toFixed(1) + 's';
-    el.style.display = 'block';
-  } else {
-    el.style.display = 'none';
-  }
+  const lines = [];
+  if (tripleLaserTimer > 0) lines.push('TRIPLE LASER ' + tripleLaserTimer.toFixed(1) + 's');
+  if (shieldTimer > 0) lines.push('SHIELD ' + shieldTimer.toFixed(1) + 's');
+  if (overdriveTimer > 0) lines.push('OVERDRIVE ' + overdriveTimer.toFixed(1) + 's');
+  el.textContent = lines.join('\n');
+  el.style.display = lines.length ? 'block' : 'none';
 }
 
 function update(dt) {
@@ -1476,6 +1544,14 @@ function update(dt) {
   // tunnel cross-section slowly morphs toward whatever shape the current
   // level/run calls for, rather than snapping
   tunnelSides += (tunnelSidesTarget - tunnelSides) * Math.min(1, dt * 0.6);
+
+  // ship glides along the bottom toward where it's aiming (a damped spring,
+  // so it overshoots a touch and settles), and its recoil/wobble decay
+  const shipTarget = Math.sin(aimAngle) * Math.min(W * 0.3, H * 0.45);
+  shipVX += ((shipTarget - shipX) * 38 - shipVX * 9) * dt;
+  shipX += shipVX * dt;
+  shipRecoil = Math.max(0, shipRecoil - dt * 7);
+  shipHitWobble = Math.max(0, shipHitWobble - dt * 2.5);
 
   // level banner fades on its own timer regardless of what else is happening
   if (levelBannerTimer > 0) {
@@ -1520,7 +1596,7 @@ function update(dt) {
     powerupTimer -= dt;
     if (powerupTimer <= 0) {
       spawnPowerup();
-      powerupTimer = bossActive ? (6 + Math.random() * 5) : (14 + Math.random() * 10);
+      powerupTimer = bossActive ? (4.5 + Math.random() * 3.5) : (8 + Math.random() * 6);
     }
 
     // move enemies toward player (z -> 0), pulled in a little faster as the vortex accelerates
@@ -1604,11 +1680,21 @@ function update(dt) {
       if (shakeTimer <= 0) shakeMag = 0;
     }
 
-    // triple-laser pickup counts down to nothing
-    if (tripleLaserTimer > 0) {
+    // pickup timers count down to nothing
+    if (tripleLaserTimer > 0 || shieldTimer > 0 || overdriveTimer > 0) {
       tripleLaserTimer = Math.max(0, tripleLaserTimer - dt);
+      shieldTimer = Math.max(0, shieldTimer - dt);
+      overdriveTimer = Math.max(0, overdriveTimer - dt);
       updateTripleUI();
     }
+    if (overdriveTimer > 0) {
+      autoFireTimer -= dt;
+      if (autoFireTimer <= 0) {
+        fire();
+        autoFireTimer = OVERDRIVE_FIRE_INTERVAL;
+      }
+    }
+    novaFlash = Math.max(0, novaFlash - dt * 1.6);
 
     // move bolts outward
     for (const b of bolts) {
@@ -1864,6 +1950,7 @@ function draw() {
       ctx.translate((Math.random() - 0.5) * shakeMag * falloff, (Math.random() - 0.5) * shakeMag * falloff);
     }
     drawTunnel();
+    drawNova();
     drawEnemies();
     drawBoss();
     drawPowerups();
@@ -2134,7 +2221,55 @@ function drawPowerups() {
     const size = Math.max(4, 17 * (1 - p.z) + 5);
     ctx.save();
     ctx.translate(pt.x, pt.y);
-    if (p.kind === 'star') {
+    if (p.kind === 'shield') {
+      // cyan hexagon with an inner ring: reads as a force field
+      ctx.rotate(t * 1.2);
+      ctx.strokeStyle = '#50e6ff';
+      ctx.shadowColor = '#50e6ff';
+      ctx.shadowBlur = 16 + Math.sin(t * 6) * 4;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i <= 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        if (i === 0) ctx.moveTo(Math.cos(a) * size, Math.sin(a) * size);
+        else ctx.lineTo(Math.cos(a) * size, Math.sin(a) * size);
+      }
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, size * 0.45, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (p.kind === 'overdrive') {
+      // orange double chevron, pointing outward and jittering: rapid fire
+      ctx.rotate(Math.sin(t * 9) * 0.15);
+      ctx.strokeStyle = '#ff8c28';
+      ctx.shadowColor = '#ff8c28';
+      ctx.shadowBlur = 18;
+      ctx.lineWidth = 2.2;
+      for (const off of [-0.35, 0.25]) {
+        ctx.beginPath();
+        ctx.moveTo(-size * 0.8, (off + 0.4) * size);
+        ctx.lineTo(0, (off - 0.4) * size);
+        ctx.lineTo(size * 0.8, (off + 0.4) * size);
+        ctx.stroke();
+      }
+    } else if (p.kind === 'nova') {
+      // magenta burst: eight spikes around a core, throbbing
+      ctx.rotate(-t * 3);
+      const throb = 1 + Math.sin(t * 12) * 0.15;
+      ctx.strokeStyle = '#ff78ff';
+      ctx.shadowColor = '#ff78ff';
+      ctx.shadowBlur = 22;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * Math.PI * 2;
+        const rr = (i % 2 === 0 ? size * 1.15 : size * 0.4) * throb;
+        if (i === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+        else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    } else if (p.kind === 'star') {
       // a Mario-star-like pickup: spins faster, flickers white/gold, unmissable
       ctx.rotate(t * 2.4);
       const flicker = Math.sin(t * 14) > 0;
@@ -2182,15 +2317,48 @@ function drawPowerups() {
 function drawShip() {
   // a blocky, low-poly faceted hull (gem-like, not a dart): wide body with
   // visible internal facet lines, short stub fins ending in thruster pods
-  const sx = CX;
-  const sy = H - Math.min(W, H) * 0.11;
   const s = Math.min(W, H) * 0.095;
-  const lean = Math.max(-0.22, Math.min(0.22, Math.sin(aimAngle) * 0.18));
+  // slides along the bottom with the aim, bobs gently, kicks back on each
+  // shot and shudders when hit
+  const sx = CX + shipX + Math.sin(t * 40) * 6 * shipHitWobble;
+  const sy = H - Math.min(W, H) * 0.11 + Math.sin(t * 2.6) * s * 0.06 + shipRecoil * s * 0.12;
+  // banks into the slide (from velocity) on top of leaning toward the aim
+  const lean = Math.max(-0.35, Math.min(0.35,
+    Math.sin(aimAngle) * 0.18 + shipVX * 0.0011 + Math.sin(t * 33) * 0.08 * shipHitWobble));
 
   ctx.save();
   ctx.translate(sx, sy);
   ctx.rotate(lean);
   ctx.scale(1, 0.82); // looking slightly down onto the hull
+
+  // thruster flames: flicker constantly, flare on recoil and under overdrive
+  {
+    const pal0 = SHIP_PALETTES[shipPaletteIndex];
+    const flare = 1 + shipRecoil * 0.8 + (overdriveTimer > 0 ? 0.6 : 0);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const side of [1, -1]) {
+      const len = (0.35 + Math.random() * 0.25) * flare;
+      const x0 = side * 1.12, x1 = side * 1.43, xm = side * 1.275;
+      ctx.beginPath();
+      ctx.moveTo(x0 * s, 0.3 * s);
+      ctx.lineTo(xm * s, (0.3 + len) * s);
+      ctx.lineTo(x1 * s, 0.3 * s);
+      ctx.strokeStyle = overdriveTimer > 0 ? 'rgba(255,150,60,0.9)' : hexToRgba(pal0.glow, 0.85);
+      ctx.shadowColor = overdriveTimer > 0 ? '#ff8c28' : pal0.glow;
+      ctx.shadowBlur = 14;
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo((x0 + side * 0.08) * s, 0.3 * s);
+      ctx.lineTo(xm * s, (0.3 + len * 0.55) * s);
+      ctx.lineTo((x1 - side * 0.08) * s, 0.3 * s);
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 
   const P = (x, y) => [x * s, y * s];
   function strokeShape(pts, close) {
@@ -2281,6 +2449,26 @@ function drawShip() {
     ctx.stroke();
   }
 
+  // shield bubble: a pulsing hex cage, flickering in its last second or two
+  if (shieldTimer > 0 && (shieldTimer > 1.5 || Math.sin(t * 30) > 0)) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.rotate(t * 0.8);
+    const r = s * (1.75 + Math.sin(t * 6) * 0.05);
+    ctx.beginPath();
+    for (let i = 0; i <= 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+      else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.strokeStyle = 'rgba(80,230,255,0.75)';
+    ctx.shadowColor = '#50e6ff';
+    ctx.shadowBlur = 18;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   ctx.restore();
 }
 
@@ -2356,6 +2544,71 @@ function drawHitLabels() {
   ctx.restore();
 }
 
+function drawNova() {
+  if (novaFlash <= 0) return;
+  // a magenta ring blasting outward from the event horizon to the player
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const z = novaFlash; // 1 (far) -> 0 (at the player)
+  ctx.beginPath();
+  for (let s = 0; s <= RING_SAMPLES; s++) {
+    const pt = pointOnRing((s / RING_SAMPLES) * Math.PI * 2, z);
+    if (s === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+  }
+  ctx.strokeStyle = `rgba(255,120,255,${0.9 * Math.sin(Math.PI * novaFlash)})`;
+  ctx.shadowColor = '#ff78ff';
+  ctx.shadowBlur = 30;
+  ctx.lineWidth = 6;
+  ctx.stroke();
+  ctx.fillStyle = `rgba(255,120,255,${0.18 * novaFlash})`;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}
+
+// Bullseye: whatever the shot will hit next (nearest enemy, or the boss, in
+// line with the aim) gets a rotating lock-on reticle. With nothing in line,
+// a faint bullseye sits out along the firing line so the aim always reads.
+function findAimTarget() {
+  let best = null;
+  for (const e of enemies) {
+    if (!e.alive || e.z > 0.95) continue;
+    if (Math.abs(normalizeAngle(aimAngle - e.angle)) < 0.4 && (!best || e.z < best.z)) best = e;
+  }
+  if (boss && boss.alive && Math.abs(normalizeAngle(aimAngle - boss.angle)) < 0.4 && (!best || boss.z < best.z)) best = boss;
+  return best;
+}
+
+function drawBullseye(x, y, r, locked) {
+  const col = locked ? '#ff3355' : 'rgba(168,85,255,0.55)';
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.strokeStyle = col;
+  ctx.shadowColor = locked ? '#ff3355' : '#a855ff';
+  ctx.shadowBlur = locked ? 14 : 6;
+  ctx.lineWidth = locked ? 2 : 1.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, Math.max(1.5, r * 0.08), 0, Math.PI * 2);
+  ctx.fillStyle = col;
+  ctx.fill();
+  // four rotating tick marks; a locked target's ticks spin in and pulse
+  ctx.rotate(locked ? t * 3 : t * 0.6);
+  const inner = r * (locked ? 1.1 + Math.sin(t * 10) * 0.08 : 1.15);
+  for (let i = 0; i < 4; i++) {
+    ctx.rotate(Math.PI / 2);
+    ctx.beginPath();
+    ctx.moveTo(inner, 0);
+    ctx.lineTo(inner + r * 0.45, 0);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawAimLine() {
   // kept straight and unswirled: this is the player's own fixed reticle, not world geometry
   const outer = pointOnRing(aimAngle, 0.0, { visual: false });
@@ -2375,6 +2628,24 @@ function drawAimLine() {
   ctx.shadowBlur = 10;
   ctx.lineWidth = 2;
   ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  if (state !== 'playing') return;
+  // dotted firing line: the path a bolt will actually take down the tunnel
+  ctx.fillStyle = 'rgba(168,85,255,0.45)';
+  for (let z = 0.06; z < 0.6; z += 0.045) {
+    const pt = pointOnRing(aimAngle, z);
+    ctx.fillRect(pt.x - 1.5, pt.y - 1.5, 3, 3);
+  }
+  const target = findAimTarget();
+  if (target) {
+    const pt = pointOnRing(target.angle, target.z);
+    const size = Math.max(10, (target === boss ? 50 : 26) * (1 - target.z) + 8);
+    drawBullseye(pt.x, pt.y, size, true);
+  } else {
+    const pt = pointOnRing(aimAngle, 0.45);
+    drawBullseye(pt.x, pt.y, 14, false);
+  }
 }
 
 // ---------- Loop ----------

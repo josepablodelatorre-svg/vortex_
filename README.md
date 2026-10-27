@@ -117,10 +117,29 @@ baseAngle, phase, fireTimer?, formSeed?, hp?}`)
   The "something hellish came through the event horizon with everything
   else" enemy (Star Wars meets Event Horizon direction).
 
+**Extra power-ups** — besides `hull` and `star`, `spawnPowerup()` rolls
+`shield` (cyan hexagon: `shieldTimer = 8`s, `damageShip()` returns early
+and shows BLOCKED), `overdrive` (orange chevrons: `overdriveTimer = 7`s of
+automatic fire every `OVERDRIVE_FIRE_INTERVAL`) and `nova` (magenta burst:
+`triggerNova()` kills every enemy and enemy bolt on screen, scoring them;
+the boss only loses its incoming fire). Mix: hull 45%, star 18%, shield
+15%, overdrive 13%, nova 9%. `#hudtriple` lists every active timer.
+
+**Ship motion** — cosmetic only (shots always leave from the centre):
+`shipX`/`shipVX` is a damped spring toward `sin(aimAngle)`, so the ship
+glides along the bottom and banks into the slide; plus idle bob,
+`shipRecoil` kick per shot, `shipHitWobble` shudder on damage, flickering
+thruster flames (orange under overdrive) and the shield cage.
+
+**Bullseye** — `findAimTarget()` picks the nearest enemy (or the boss)
+within the bolt hit tolerance of the aim; `drawBullseye()` puts a rotating
+red lock-on on it, or a faint purple bullseye out along the dotted firing
+line when nothing is in line.
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups
-heal 32 (of `HULL_MAX = 100`).
+heal 45 (of `HULL_MAX = 150`, raised from 100 to make runs last).
 
 **Power-ups** (`powerups` array, `{angle, z, alive, kind}`)
 - `kind: 'hull'` (~78% of spawns) — gold triangle, repairs hull.
