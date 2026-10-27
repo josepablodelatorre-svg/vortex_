@@ -860,6 +860,52 @@
     box-shadow: 0 0 12px rgba(255,120,255,0.5);
     z-index: 5;
   }
+  /* pause: under the radar, only during a run */
+  #pauseBtn {
+    position: fixed;
+    right: 18px;
+    top: 150px;
+    display: none;
+    background: rgba(10, 0, 24, 0.6);
+    border: 1px solid rgba(168, 85, 255, 0.6);
+    color: #c9a0ff;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-size: 10px;
+    padding: 9px 10px;
+    cursor: pointer;
+    z-index: 5;
+  }
+  body.inrun.playing #pauseBtn { display: block; }
+  #pause {
+    position: fixed;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    background: rgba(5, 0, 15, 0.9);
+    color: #c9a0ff;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    text-align: center;
+    text-shadow: 0 0 12px #a855ff;
+    z-index: 60;
+  }
+  body.paused #pause { display: flex; }
+  #pause h1 { font-size: 26px; letter-spacing: 6px; margin: 0 0 8px; }
+  #pause p { font-size: 9px; opacity: 0.7; margin: 0; }
+  #pause button {
+    min-width: 200px;
+    background: rgba(10, 0, 24, 0.8);
+    border: 1px solid #a855ff;
+    color: #e6d4ff;
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 2px;
+    padding: 14px 18px;
+    cursor: pointer;
+  }
+  #pause #resumeBtn { border-color: #3f6; color: #b9ffcb; box-shadow: 0 0 14px rgba(63,255,102,0.45); }
   #lockBtn {
     position: fixed;
     right: 16px;
@@ -1139,6 +1185,13 @@
 </div>
 <button id="zapBtn">BOMB</button>
 <button id="lockBtn">LOCK</button>
+<button id="pauseBtn" aria-label="Pause">II</button>
+<div id="pause">
+  <h1>PAUSED</h1>
+  <button id="resumeBtn">RESUME</button>
+  <button id="pauseMenuBtn">MENU</button>
+  <p>P / ESC TO RESUME</p>
+</div>
 <div id="toast"></div>
 <div id="vspanel"><span id="vsname">VS</span><div id="vshull"><div id="vshullfill"></div></div><span id="vsscore">0</span></div>
 <div id="lobby">
@@ -3184,6 +3237,12 @@ window.addEventListener('keydown', (e) => {
     else if (e.code === 'Escape') cyQuit();
     return;
   }
+  if (e.code === 'KeyP' || e.code === 'Escape') {
+    e.preventDefault();
+    if (paused) resumeGame(); else pauseGame();
+    return;
+  }
+  if (paused) return;
   if (e.code === 'Space') {
     e.preventDefault();
     superzap();
@@ -7204,6 +7263,47 @@ document.getElementById('playBtn').addEventListener('click', (e) => {
   startGame(false, 'campaign');
 });
 // back to the menu from a results screen
+// ---- pause ----
+// P / Esc / the II button, and automatically whenever the app is hidden
+// (phone lock, tab switch, notification shade). Not in versus: the other
+// player's run keeps going, so a pause there would just hand them the win.
+let paused = false;
+let pausedTracks = [];
+function canPause() {
+  return state === 'playing' && !versus;
+}
+function pauseGame() {
+  if (paused || !canPause()) return;
+  paused = true;
+  pointerHeld = false;
+  document.body.classList.add('paused');
+  pausedTracks = Object.values(MUSIC_TRACKS).filter(el => !el.paused);
+  for (const el of pausedTracks) el.pause();
+  if (actx && actx.state === 'running') actx.suspend().catch(() => {});
+}
+function resumeGame() {
+  if (!paused) return;
+  paused = false;
+  pointerHeld = false;
+  document.body.classList.remove('paused');
+  if (actx && actx.state === 'suspended') actx.resume().catch(() => {});
+  for (const el of pausedTracks) el.play().catch(() => {});
+  pausedTracks = [];
+  lastTime = performance.now(); // no giant frame step after the break
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
+window.addEventListener('blur', pauseGame);
+document.getElementById('pauseBtn').addEventListener('click', (e) => { e.stopPropagation(); pauseGame(); });
+document.getElementById('resumeBtn').addEventListener('click', (e) => { e.stopPropagation(); resumeGame(); });
+document.getElementById('pauseMenuBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  resumeGame();
+  backToMenu();
+});
+for (const id of ['pause', 'pauseBtn']) {
+  document.getElementById(id).addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+}
+
 function backToMenu() {
   if (versus && vsConn) { try { vsConn.close(); } catch (err) { /* ignore */ } }
   versus = false;
@@ -7214,8 +7314,13 @@ function backToMenu() {
   setMusicTrack('garden');
 }
 // the HUD only shows while a run (or its results) is on screen
+const pauseBtnEl = document.getElementById('pauseBtn');
 function syncRunClass() {
   document.body.classList.toggle('inrun', state === 'playing' || state === 'gameover' || state === 'cleared');
+  document.body.classList.toggle('playing', canPause());
+  // the pause button sits just under the radar, whose size follows the screen
+  const top = Math.round(2 * Math.max(38, Math.min(62, Math.min(W, H) * 0.09)) + 30) + 'px';
+  if (pauseBtnEl.style.top !== top) pauseBtnEl.style.top = top;
 }
 
 // a first visit (or a broken save) gets its first three missions; this
@@ -7286,6 +7391,12 @@ function drawShipPreview() {
 function loop(now) {
   const dt = Math.min(0.05, (now - lastTime) / 1000);
   lastTime = now;
+  if (paused) {
+    // the world holds still behind the overlay; nothing ticks
+    if (state !== 'playing') resumeGame();
+    requestAnimationFrame(loop);
+    return;
+  }
   update(dt);
   draw();
   updateJackIn(dt);

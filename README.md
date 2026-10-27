@@ -324,6 +324,13 @@ with a `vent` track item you must shoot (+500), sent at 85% of the level
 just before the boss (`ventSpawned`); asteroid fields add `rock`
 enemies (3 hp).
 
+**Pause** — P / Esc / the II button under the radar (`pauseGame()` /
+`resumeGame()`); the game also pauses itself on `visibilitychange` and
+window `blur` (phone lock, tab switch). While paused the loop skips every
+update, the music elements pause and the AudioContext is suspended.
+Not available in versus. MENU on the overlay leaves the run (the
+checkpoint is kept).
+
 **Warp ink** — `startWarp()` sets `inkTimer = INK_TIME` (7s): a CSS
 grayscale + invert + contrast filter on the canvas turns everything into
 black ink on white, easing in and out (it overrides the hoop hue trip).
