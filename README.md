@@ -36,6 +36,7 @@ src/             — the game, as plain scripts loaded in this order:
   main.js          the requestAnimationFrame loop
 pad.html         — the phone controller for co-op
 lib/             — PeerJS + qrcode-generator (MIT, see LICENSES.txt)
+fonts/           — Press Start 2P (SIL Open Font License, fonts/OFL.txt)
 img/nemo-logo.png
 audio/
   garden.mp3       — calm theme, plays on title/results screens

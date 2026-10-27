@@ -4,10 +4,10 @@
 // is used when there isn't. The soundtrack (large, streamed with range
 // requests) is cached once fully downloaded; until then offline play is
 // silent music-wise. Multiplayer always needs the network.
-const CACHE = 'vortex-v1';
+const CACHE = 'vortex-v2';
 const SHELL = [
   './', 'index.html', 'pad.html', 'style.css', 'manifest.webmanifest',
-  'img/nemo-logo.png', 'img/icons/icon-192.png', 'img/icons/icon-512.png',
+  'img/nemo-logo.png', 'img/icons/icon-192.png', 'img/icons/icon-512.png', 'fonts/press-start-2p.woff2',
   'lib/peerjs.min.js', 'lib/qrcode.js',
   'src/save.js', 'src/audio.js', 'src/progression.js', 'src/world.js', 'src/environments.js',
   'src/input.js', 'src/meta.js', 'src/flow.js', 'src/pilot.js', 'src/update.js',
@@ -28,10 +28,7 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  // the font comes from Google: cache it after the first load
-  const sameOrigin = url.origin === self.location.origin;
-  const isFont = /fonts\.(googleapis|gstatic)\.com$/.test(url.hostname);
-  if (!sameOrigin && !isFont) return;
+  if (url.origin !== self.location.origin) return;
   // music: whole files from the cache when we have them; range requests
   // (streaming) go to the network, and a full copy is fetched in the
   // background the first time so the next offline session has it
@@ -45,7 +42,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
   e.respondWith(fetch(req).then(res => {
-    if (res.ok && (sameOrigin || isFont)) {
+    if (res.ok) {
       const copy = res.clone();
       caches.open(CACHE).then(c => c.put(req, copy));
     }
