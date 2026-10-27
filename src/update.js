@@ -166,11 +166,20 @@ function update(dt) {
     if (boss && boss.alive) {
       boss.z -= 0.025 * dt;
       if (boss.form !== 'watchdog') {
-        // warships hunt the ship: they drift round the ring toward its lane,
-        // a little faster each level, so their volleys have to be dodged
-        const chase = (boss.kind === 'mini' ? 0.5 : 0.35 + 0.05 * currentLevel) * dt;
-        const gap = normalizeAngle(shipLane - boss.angle);
-        boss.angle = normalizeAngle(boss.angle + Math.sign(gap) * Math.min(Math.abs(gap), chase));
+        // warships hunt the ship in bursts: hold position (a window to land
+        // hits), then swing round to where the ship is now, so their volleys
+        // still have to be dodged. Holds shorten each level.
+        boss.holdTimer = (boss.holdTimer === undefined ? 2.5 : boss.holdTimer) - dt;
+        if (boss.holdTimer <= 0 && boss.moveTo === undefined) boss.moveTo = shipLane;
+        if (boss.moveTo !== undefined) {
+          const gap = normalizeAngle(boss.moveTo - boss.angle);
+          const step = 1.6 * dt;
+          boss.angle = normalizeAngle(boss.angle + Math.sign(gap) * Math.min(Math.abs(gap), step));
+          if (Math.abs(gap) <= step) {
+            boss.moveTo = undefined;
+            boss.holdTimer = (boss.kind === 'mini' ? 2.2 : 3.4 - 0.25 * currentLevel) + Math.random();
+          }
+        }
       }
       if (boss.form === 'watchdog') {
         // sways across the bottom of the tunnel, where the ship flies

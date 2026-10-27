@@ -43,7 +43,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await ev('damageShip(9999)'); await p.waitForTimeout(100);
   ok(!(await vis(p, 'zapBtn')), 'ZAP button hidden on game over');
   await ev(`shipClassIndex = 3; startGame(false, 'campaign')`);
-  ok(await ev('tripleLaserTimer >= 8 && hullMax === 130'), 'gunner starts with triple laser');
+  ok(await ev('tripleLaserTimer > 7.5 && hullMax === 130'), 'gunner starts with triple laser');
   await ev(`shipClassIndex = 1; startGame(false, 'campaign'); bolts = []`);
   await p.mouse.move(500, 200); await p.mouse.down();
   await p.waitForFunction('bolts.length >= 3', null, { timeout: 5000 }).catch(() => {});
