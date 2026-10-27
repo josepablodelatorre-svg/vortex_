@@ -923,6 +923,8 @@
     text-shadow: none;
   }
   #riftStart { display: none; }
+  #continueBtn { display: none; }
+  #contFromLost { display: none; color: #3f6; border-color: #3f6; text-shadow: 0 0 8px #3f6; box-shadow: 0 0 10px rgba(63,255,102,0.35); }
   #title .menu #riftStart { color: #ff5570; border-color: #ff1e3c; text-shadow: 0 0 8px #ff1e3c; }
   #title .menu #dailyBtn { color: #ffe14d; border-color: #ffe14d; text-shadow: 0 0 6px #ffe14d; }
   /* ---------- phones: compact everything, respect the notch ---------- */
@@ -1041,6 +1043,7 @@
     <h2>MAIN MENU</h2>
     <p id="loadout"></p>
     <div class="menu">
+      <button id="continueBtn" class="primary">CONTINUE</button>
       <button id="playBtn" class="primary">PLAY</button>
       <button id="dailyBtn">DAILY TUNNEL</button>
       <button id="riftStart" class="riftBtn">ENTER THE RIFT</button>
@@ -1144,6 +1147,7 @@
   <div class="rank" id="rankLost"></div>
   <p id="finalscore"></p>
   <p id="losthint">CLICK TO RETRY</p>
+  <button id="contFromLost" class="riftBtn">CONTINUE FROM CHECKPOINT</button>
   <div class="resultBtns"><button class="clipBtn">SAVE CLIP</button><button class="shareBtn">SHARE</button><button class="menuBtn">MENU</button></div>
 </div>
 <div id="cleared">
@@ -1987,6 +1991,59 @@ function checkStreak() {
   setTimeout(() => showToast('DAY ' + streak.days + ' STREAK!\n+' + reward + ' COINS'), 600);
 }
 
+// ---------- Checkpoints (saved as vortex-checkpoint) ----------
+// Campaign runs save a checkpoint at the start of every level from level 2
+// and again halfway through a level, when its route changes scenery. It
+// survives closing the game: CONTINUE (on SIGNAL LOST and in the menu)
+// restarts from there with the score you had. Not for daily / Rift /
+// versus runs, which are about one clean run.
+let checkpoint = null;
+try { checkpoint = JSON.parse(localStorage.getItem('vortex-checkpoint') || 'null'); } catch (e) { checkpoint = null; }
+
+function saveCheckpoint(mid) {
+  if (gameMode !== 'campaign' || daily || versus) return;
+  checkpoint = {
+    level: currentLevel, runTier, score, mid,
+    killCount, coresGot, missionTime, nextMinibossIndex, missionType
+  };
+  try { localStorage.setItem('vortex-checkpoint', JSON.stringify(checkpoint)); } catch (e) { /* ignore */ }
+  shipCallout('CHECKPOINT', '#3f6');
+}
+
+function clearCheckpoint() {
+  checkpoint = null;
+  try { localStorage.removeItem('vortex-checkpoint'); } catch (e) { /* ignore */ }
+}
+
+function checkpointLabel() {
+  return checkpoint ? 'LEVEL ' + checkpoint.level + (checkpoint.mid ? ' (MIDWAY)' : '') : '';
+}
+
+function continueFromCheckpoint() {
+  if (!checkpoint) return;
+  const cp = checkpoint;
+  initAudio();
+  startGame(false, 'campaign');
+  runTier = cp.runTier;
+  currentLevel = cp.level;
+  score = cp.score;
+  document.getElementById('score').textContent = score;
+  document.getElementById('levelnum').textContent = currentLevel;
+  tunnelSidesTarget = computeShapeStage();
+  tunnelSides = tunnelSidesTarget;
+  updateRunUI();
+  showLevelBanner('CHECKPOINT - LEVEL ' + currentLevel);
+  onLevelStart();
+  if (cp.mid && cp.missionType === missionType) {
+    killCount = cp.killCount;
+    coresGot = cp.coresGot;
+    missionTime = cp.missionTime;
+    nextMinibossIndex = cp.nextMinibossIndex;
+    updateObjectiveUI();
+    saveCheckpoint(true); // keep the midway point, not just the level start
+  }
+}
+
 // power: charged by kills, spent on lock-in mode
 const POWER_PER_KILL = 7;
 let power = 0;
@@ -2745,6 +2802,8 @@ function setEnv(name, quiet) {
   envFlash = quiet ? 0 : 1;
   tunnelSidesTarget = name === 'trench' ? 4 : (gameMode === 'rift' ? pickRiftShape() : computeShapeStage());
   if (leaving === 'trench' && !quiet) spawnVent();
+  // (a miniboss fight can be under way: continuing just skips that miniboss)
+  if (!quiet && gameMode === 'campaign' && state === 'playing') saveCheckpoint(true);
   if (!quiet) {
     showLevelBanner(ENV[name].name);
     say('env-' + name, ENV_LINES[name], 2, 20);
@@ -3652,6 +3711,8 @@ function endGame() {
   updateZapUI();
   recordRunResult();
   showRank('rankLost', false);
+  document.getElementById('contFromLost').style.display = (gameMode === 'campaign' && !daily && !versus && checkpoint) ? 'block' : 'none';
+  document.getElementById('contFromLost').textContent = 'CONTINUE FROM ' + checkpointLabel();
   if (versus) {
     document.getElementById('losttitle').textContent = 'DEFEATED';
     document.getElementById('losthint').textContent = vsConn ? 'CLICK FOR A REMATCH' : 'CLICK TO RETRY';
@@ -3674,6 +3735,7 @@ function winGame() {
   recordRunResult();
   unlockRift();
   unlockAchievement('user');
+  clearCheckpoint();
   showRank('rankWon', true);
   recordDaily();
   updateDailyBtn();
@@ -4113,6 +4175,7 @@ function shipCallout(text, color) {
 // superzapper and applies the ship class's level-start perks.
 function onLevelStart() {
   zapperCharges = 1 + up('bomb');
+  if (currentLevel > 1) saveCheckpoint(false);
   if (gameMode === 'campaign') missionEvent('level', currentLevel);
   setEnv(routeEnv(), true);
   // the level banner names where this level starts
@@ -6958,7 +7021,13 @@ let titleScreen = 'splash';
 function showScreen(name) {
   titleScreen = name;
   document.querySelectorAll('#title .screen').forEach(sc => sc.classList.toggle('active', sc.dataset.screen === name));
-  if (name === 'menu') updateLoadout();
+  if (name === 'menu') {
+    updateLoadout();
+    const cb = document.getElementById('continueBtn');
+    cb.style.display = checkpoint ? 'block' : 'none';
+    cb.textContent = 'CONTINUE: ' + checkpointLabel();
+    document.getElementById('playBtn').classList.toggle('primary', !checkpoint);
+  }
   if (name === 'shop') renderShop();
   if (name === 'missions') renderMissions();
   const doneCount = missionState.active.filter(m => m.p >= m.n).length;
@@ -6982,6 +7051,14 @@ document.querySelectorAll('#title [data-go]').forEach(btn => {
     showScreen(btn.dataset.go);
     playZap();
   });
+});
+document.getElementById('continueBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  continueFromCheckpoint();
+});
+document.getElementById('contFromLost').addEventListener('click', (e) => {
+  e.stopPropagation();
+  continueFromCheckpoint();
 });
 document.getElementById('playBtn').addEventListener('click', (e) => {
   e.stopPropagation();

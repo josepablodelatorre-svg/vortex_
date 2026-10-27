@@ -343,6 +343,13 @@ restarts `vortex-streak` and pays 20 × days (max 7). MISSIONS screen in
 the menu. Toasts now queue (`showToast` → `nextToast`) so several at
 once are each shown.
 
+**Checkpoints** — campaign only (not daily/Rift/versus). `saveCheckpoint()`
+at every level start from level 2 (`onLevelStart`) and midway, when the
+route changes scenery (`setEnv`), into `vortex-checkpoint` with level,
+run tier, score and the mission progress. CONTINUE on SIGNAL LOST
+(`#contFromLost`) and in the menu (`#continueBtn`) call
+`continueFromCheckpoint()`. Beating the campaign clears it.
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups
