@@ -276,6 +276,20 @@ line with a `?daily` link, which highlights the daily button.
 decay, tunnel pull and swirl. These used to read `t` (time since the page
 loaded), so a second run in the same session started harder.
 
+**Dodging** — the ship rides an arc around the lower half of the screen
+(`shipLane`, 3 to 9 o'clock, `shipScreenPos()`), following the aim at up
+to `LANE_SPEED` and parking at an end when you aim upward; its nose points
+at the centre. Enemies, enemy bolts and boss contact only hurt inside the
+ship's lane (`inShipLane()`, `LANE_HIT`); near misses call out DODGED!.
+
+**Three bars** — HULL; PLSM, a plasma shield (`PLASMA_FRACTION` of the
+hull) that takes hits first and recharges after `PLASMA_REGEN_DELAY`; PWR,
+charged `POWER_PER_KILL` per kill. The bomb (zapper) shows as `BOMB x1`.
+
+**Lock-in** — with PWR full, L or the LOCK button: for `LOCKIN_DURATION`
+the ship flies a tighter ring further in, can ride the whole 360°, slides
+twice as fast and auto-fires; power drains as it runs.
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups
