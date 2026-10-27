@@ -25,6 +25,7 @@ src/             — the game, as plain scripts loaded in this order:
                    the Rift, level objectives
   world.js         difficulty, tunnel + camera path, entity lists, projection
   environments.js  tube / trench / asteroids / space / planet surface
+  turrets.js       gun turrets on the trench walls and the planet's ground
   input.js         mouse, touch, keyboard, cockpit view
   meta.js          CRT, achievements, palettes, ship classes, clips, daily
                    tunnel, ranks, best scores, screen shake
@@ -482,6 +483,15 @@ window `blur` (phone lock, tab switch). While paused the loop skips every
 update, the music elements pause and the AudioContext is suspended.
 Not available in versus. MENU on the overlay leaves the run (the
 checkpoint is kept).
+
+**Turrets** — `src/turrets.js`: in the trench, emplacements bolted to
+the walls and floor; on the planet, domes on the ground. They scroll in
+with the scenery (`updateTurrets()` / `drawTurrets()`), fire an orange
+tracer with a muzzle flash every couple of seconds (scaled by the
+difficulty's `fire`), and the tracer swings toward the lane the ship was
+in when it fired (`targetAngle` on the enemy bolt), so you dodge by
+moving. Two hits destroy one (20 points, counts as a kill). Shown on the
+radar.
 
 **Warp ink** — `startWarp()` sets `inkTimer = INK_TIME` (7s): a CSS
 grayscale + invert + contrast filter on the canvas turns everything into

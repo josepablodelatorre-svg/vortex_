@@ -252,6 +252,7 @@ function startWarp(banner) {
   spikeTimer = 0.5;
   enemies = [];
   enemyBolts = [];
+  turrets = [];
   showLevelBanner('WARP');
   triggerShake(8, 0.4);
   inkTimer = INK_TIME;

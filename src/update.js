@@ -131,6 +131,7 @@ function update(dt) {
     }
     for (const eb of enemyBolts) {
       eb.z -= 0.4 * pullFactor * dt;
+      if (eb.targetAngle !== undefined) eb.angle = normalizeAngle(eb.angle + normalizeAngle(eb.targetAngle - eb.angle) * Math.min(1, dt * 2.2));
     }
 
     // enemy reaches the rim: it only hurts if it's in the ship's lane,

@@ -50,6 +50,7 @@ function draw() {
     drawSurface(env === 'surface' ? 1 - envK.tunnel : 0);
     drawTunnel();
     drawTrackItems();
+    drawTurrets();
     drawWarp();
     drawNova();
     drawEnemies();
@@ -134,6 +135,7 @@ function drawRadar(cxIn, cyIn, rIn, inDash) {
     if (e.z < 0.2 && Math.sin(t * 20) < 0) continue;
     dot(e.angle, e.z, e.type === 'pentagram' ? '#ff1e3c' : '#ff9f43', 4);
   }
+  for (const tu of turrets) dot(tu.angle, tu.z, '#ff8c28', 4);
   if (boss && boss.alive) dot(boss.angle, boss.z, '#ff5533', 8);
   ctx.fillStyle = 'rgba(63,255,102,0.7)';
   ctx.font = "7px 'Press Start 2P', 'Courier New', monospace";
@@ -417,10 +419,10 @@ function drawEnemyBolts() {
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
-    ctx.strokeStyle = '#3cbeff';
-    ctx.shadowColor = '#3cbeff';
+    ctx.strokeStyle = eb.tracer ? '#ff8c28' : '#3cbeff';
+    ctx.shadowColor = ctx.strokeStyle;
     ctx.shadowBlur = 12;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = eb.tracer ? 3 : 2;
     ctx.stroke();
   }
   ctx.restore();

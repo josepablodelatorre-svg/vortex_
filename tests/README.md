@@ -41,6 +41,7 @@ GitHub runs the whole suite on every push and pull request
 | `gamepad` | fake controller: menus, aiming, auto-fire, bomb, pause |
 | `backup` | credits, save code copy/file, restore from code and file |
 | `spanish` | LANGUAGE toggle: menus, HUD, banner, results in Spanish and back |
+| `turrets` | trench wall turrets, planet ground turrets, tracers, two-hit kills |
 | `pause` | P / Esc / button, auto-pause when hidden, MENU, no pause in versus |
 | `ship-classes` | class choice, hulls, bombs, warp spikes, gunner + interceptor perks |
 | `powerups` | shield, nova, ship movement, bullseye lock, pickup mix |
