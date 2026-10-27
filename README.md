@@ -10,15 +10,17 @@ no bundler, no external JS frameworks — plain HTML5 Canvas2D + Web Audio.
 Just open `index.html` directly in a browser (double-click it, or
 `file://` it). No server, no npm install, nothing to build. The `audio/`
 folder must sit next to `index.html` — the game loads the soundtrack by
-relative path (`audio/garden.m4a`, `audio/destruction.m4a`).
+relative path (`audio/*.mp3`).
 
 ## File layout
 
 ```
 index.html   — everything: HTML, CSS, game logic, all in one file
 audio/
-  garden.m4a       — calm theme, plays on title/results screens
-  destruction.m4a  — aggressive theme, plays during gameplay
+  garden.mp3       — calm theme, plays on title/results screens
+  destruction.mp3  — aggressive theme, plays during gameplay
+  nocherandom.mp3  — THE RIFT
+  cuerpoacido.mp3  — boss fights
 ```
 
 The NEMO INC. logo on the title screen is embedded directly in
@@ -403,10 +405,14 @@ heal 45 (of `HULL_MAX = 150`, raised from 100 to make runs last).
 - WebAudio procedural SFX (`playBass`, `playZap`, `playHit`, `playDamage`,
   `playPowerUp`, `playEnemyShot`, `playBossHit`) — no audio files, pure
   oscillators.
-- Background music is two `<audio>` elements (`musicGarden`,
-  `musicDestruction`), mastered to -9 LUFS / -1 dBTP so they sit at
-  commercial loudness, crossfaded via `setMusicTrack('garden'|
-  'destruction')` on every state change (title/results vs gameplay).
+- Background music is four `<audio>` elements (`MUSIC_TRACKS`: garden,
+  destruction, rift, boss) crossfaded by `setMusicTrack()` on every state
+  change. All are 160 kbps MP3 at about -10 LUFS, peak-limited (4x
+  oversampled `alimiter`) so nothing clips — about 33 MB in total, down
+  from 43 MB. Nothing preloads: garden and destruction start streaming on
+  the first tap (`startMusic()`), rift and boss when first needed.
+  Re-encode command, from the masters:
+  `ffmpeg -i in.wav -af "aresample=176400,alimiter=limit=0.84:attack=1:release=60:level=disabled,aresample=44100" -c:a libmp3lame -b:a 160k out.mp3`
 
 **Music-reactive visuals** — `initMusicAnalyser()` routes both music
 tracks through an `AnalyserNode`; `updateMusicMood(dt)` (called from

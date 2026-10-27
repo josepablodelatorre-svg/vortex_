@@ -56,6 +56,6 @@ No test suite — instead:
   transitions, make sure both paths agree on the `continuing` argument,
   or clicking off-center silently drops New-Game-Plus escalation (this
   exact bug happened once already).
-- `audio/garden.m4a` and `audio/destruction.m4a` must stay next to
+- The `audio/` MP3s must stay next to
   `index.html` (relative path) — don't let a repackage step leave them
   behind.

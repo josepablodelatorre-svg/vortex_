@@ -1322,14 +1322,18 @@ function initAudio() {
 }
 
 // ---------- Music (background soundtrack, separate from the WebAudio SFX) ----------
-// Mastered to -9 LUFS / -1 dBTP so they sit at commercial loudness alongside
-// the procedural sound effects instead of sounding thin next to them.
-const musicGarden = new Audio('audio/garden.m4a');       // calm, title/results theme
-const musicDestruction = new Audio('audio/destruction.m4a'); // aggressive, gameplay theme
+// Mastered loud (about -10 LUFS, peak-limited) so they sit at commercial
+// loudness alongside the procedural sound effects.
+// All four tracks are 160 kbps MP3s (about 33 MB together) and nothing is
+// fetched at page load: browsers won't play music before the first tap
+// anyway, so the title and gameplay themes start streaming on that tap
+// (startMusic) and the other two only when first needed.
+const musicGarden = new Audio('audio/garden.mp3');       // calm, title/results theme
+const musicDestruction = new Audio('audio/destruction.mp3'); // aggressive, gameplay theme
 musicGarden.loop = true;
 musicDestruction.loop = true;
-musicGarden.preload = 'auto';
-musicDestruction.preload = 'auto';
+musicGarden.preload = 'none';
+musicDestruction.preload = 'none';
 musicGarden.volume = 0;
 musicDestruction.volume = 0;
 // Extra tracks (mastered to match): Noche Random scores THE RIFT, Cuerpo
@@ -7244,7 +7248,11 @@ function updateLoadout() {
 // any tap on the splash (or on the canvas behind it) moves on to the menu
 function titleTap() {
   initAudio();
-  if (titleScreen === 'splash') { showScreen('menu'); playZap(); }
+  if (titleScreen === 'splash') {
+    showScreen('menu');
+    playZap();
+    setMusicTrack('garden'); // first tap: the title theme starts streaming
+  }
 }
 document.querySelectorAll('#title [data-go]').forEach(btn => {
   btn.addEventListener('click', (e) => {
