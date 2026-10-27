@@ -485,9 +485,10 @@ function boardEntries(mode) {
   return mode === 'daily' ? list.filter(e => e.date === todayKey()) : list;
 }
 
-// returns the run's place on its board (1..10), or 0 if it didn't make it
+// adds the run to its local board; returns { place (1..10, or 0 if it
+// didn't make it), entry, mode }, or null for runs that don't count
 function addToBoard() {
-  if (versus || score <= 0) return 0;
+  if (versus || score <= 0) return null;
   const mode = daily ? 'daily' : gameMode === 'rift' ? 'rift' : 'campaign';
   const won = state === 'cleared';
   const entry = {
@@ -506,14 +507,31 @@ function addToBoard() {
   boards[mode] = list;
   try { store.setItem('vortex-leaderboard', JSON.stringify(boards)); } catch (e) { /* ignore */ }
   const place = list.indexOf(entry) + 1;
-  if (place) { lastBoardEntry = entry; boardView = mode; }
-  return place;
+  boardView = mode;
+  lastBoardEntry = entry;
+  return { place, entry, mode };
 }
 
+let boardScope = 'local'; // 'local' (this device) or 'world' (online)
 function renderBoard() {
   for (const b of document.querySelectorAll('#boardtabs button')) b.classList.toggle('selected', b.dataset.board === boardView);
+  for (const b of document.querySelectorAll('#boardscope button')) b.classList.toggle('selected', b.dataset.scope === boardScope);
+  document.getElementById('boardscope').style.display = onlineEnabled() ? '' : 'none';
+  document.getElementById('boardnote').textContent = boardScope === 'world' ? 'TOP 10 IN THE WORLD' : 'TOP 10 ON THIS DEVICE';
   const el = document.getElementById('boardlist');
-  const list = boardEntries(boardView);
+  if (boardScope === 'world' && onlineEnabled()) {
+    el.innerHTML = '<div class="boardempty">CONNECTING...</div>';
+    const view = boardView;
+    fetchWorldBoard(view)
+      .then(list => { if (boardScope === 'world' && boardView === view) fillBoard(list, true); })
+      .catch(() => { if (boardScope === 'world' && boardView === view) el.innerHTML = '<div class="boardempty">WORLD BOARD UNREACHABLE. CHECK YOUR CONNECTION.</div>'; });
+    return;
+  }
+  fillBoard(boardEntries(boardView), false);
+}
+
+function fillBoard(list, world) {
+  const el = document.getElementById('boardlist');
   el.innerHTML = '';
   if (!list.length) {
     el.innerHTML = '<div class="boardempty">' + (boardView === 'daily' ? 'NO RUNS ON TODAY\'S TUNNEL YET' : 'NO RUNS YET. GO SET ONE!') + '</div>';
@@ -521,7 +539,10 @@ function renderBoard() {
   }
   list.forEach((e, i) => {
     const row = document.createElement('div');
-    row.className = 'boardrow' + (e === lastBoardEntry || (lastBoardEntry && e.at === lastBoardEntry.at) ? ' me' : '');
+    const mine = lastBoardEntry && (world
+      ? e.score === lastBoardEntry.score && e.name === cleanName(lastBoardEntry.name)
+      : e === lastBoardEntry || e.at === lastBoardEntry.at);
+    row.className = 'boardrow' + (mine ? ' me' : '');
     const cells = ['#' + (i + 1), e.name, e.score, e.reach, e.rank];
     ['', 'nm', 'sc', '', 'rk'].forEach((cls, k) => {
       const span = document.createElement('span');
@@ -536,11 +557,22 @@ function renderBoard() {
 for (const b of document.querySelectorAll('#boardtabs button')) {
   b.addEventListener('click', (ev) => { ev.stopPropagation(); boardView = b.dataset.board; renderBoard(); });
 }
+for (const b of document.querySelectorAll('#boardscope button')) {
+  b.addEventListener('click', (ev) => { ev.stopPropagation(); boardScope = b.dataset.scope; renderBoard(); });
+}
 
 function recordRunResult() {
-  const place = addToBoard();
+  const result = addToBoard();
+  const place = result ? result.place : 0;
   const tag = document.getElementById(state === 'cleared' ? 'boardWon' : 'boardLost');
   tag.textContent = place === 1 ? 'NEW #1 ON THE LEADERBOARD!' : place ? 'LEADERBOARD #' + place : '';
+  // and to the world board; its place is added to the line when it's known
+  if (result && onlineEnabled()) {
+    submitOnline(result.entry, result.mode).then(world => {
+      if (!world) return;
+      tag.textContent = (tag.textContent ? tag.textContent + '   ' : '') + 'WORLD #' + world;
+    });
+  }
   if (versus) return; // versus scores don't count toward the solo records
   if (gameMode === 'rift') {
     // the Rift keeps its own records: its multiplied scores would swamp

@@ -11,7 +11,7 @@ const SHELL = [
   'lib/peerjs.min.js', 'lib/qrcode.js',
   'src/save.js', 'src/audio.js', 'src/progression.js', 'src/world.js', 'src/environments.js',
   'src/input.js', 'src/meta.js', 'src/flow.js', 'src/pilot.js', 'src/update.js',
-  'src/draw.js', 'src/multiplayer.js', 'src/screens.js', 'src/gamepad.js', 'src/main.js'
+  'src/draw.js', 'src/multiplayer.js', 'src/screens.js', 'src/online.js', 'src/gamepad.js', 'src/main.js'
 ];
 
 self.addEventListener('install', (e) => {

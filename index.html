@@ -110,9 +110,10 @@
   </section>
   <section class="screen" data-screen="board">
     <h2>LEADERBOARD</h2>
-    <div id="boardtabs"><button data-board="campaign" class="selected">CAMPAIGN</button><button data-board="rift">RIFT</button><button data-board="daily">DAILY</button></div>
+    <div id="boardscope" class="boardtabs"><button data-scope="local" class="selected">THIS DEVICE</button><button data-scope="world">WORLD</button></div>
+    <div id="boardtabs" class="boardtabs"><button data-board="campaign" class="selected">CAMPAIGN</button><button data-board="rift">RIFT</button><button data-board="daily">DAILY</button></div>
     <div id="boardlist"></div>
-    <p class="menunote">TOP 10 ON THIS DEVICE</p>
+    <p class="menunote" id="boardnote">TOP 10 ON THIS DEVICE</p>
     <button class="back" data-go="menu">&lt; BACK</button>
   </section>
   <section class="screen" data-screen="shop">
@@ -236,6 +237,7 @@
 <script src="src/draw.js"></script>
 <script src="src/multiplayer.js"></script>
 <script src="src/screens.js"></script>
+<script src="src/online.js"></script>
 <script src="src/gamepad.js"></script>
 <script src="src/main.js"></script>
 <script>

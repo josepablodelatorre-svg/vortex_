@@ -19,7 +19,8 @@ node run.js coop pause      # only files whose name contains a word
 and, for the multiplayer tests, starts a local PeerJS server on
 `127.0.0.1:9000` (`peer-server.js`; the game uses it through
 `?peerhost=127.0.0.1:9000`). If something is already listening on either
-port it is reused. Screenshots land in `tests/shots/` (not committed).
+port it is reused. It also runs `scores-server.js` on `127.0.0.1:8790`, a
+stand-in for the Supabase leaderboard API. Screenshots land in `tests/shots/` (not committed).
 
 ## Files
 
@@ -33,7 +34,7 @@ port it is reused. Screenshots land in `tests/shots/` (not committed).
 | `save` | old keys folded into the one versioned save, reload, corrupt save, pad |
 | `flashing` | photosensitivity warning, reduced flashing effects, settings toggle |
 | `install` | manifest + icons, service worker caching, loads and plays offline |
-| `leaderboard` | top-10 boards per mode, results tag, board screen, saved |
+| `leaderboard` | local top 10s, world board via the stand-in, offline queue |
 | `gamepad` | fake controller: menus, aiming, auto-fire, bomb, pause |
 | `backup` | credits, save code copy/file, restore from code and file |
 | `pause` | P / Esc / button, auto-pause when hidden, MENU, no pause in versus |

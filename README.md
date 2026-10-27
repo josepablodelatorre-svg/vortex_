@@ -33,6 +33,7 @@ src/             — the game, as plain scripts loaded in this order:
   draw.js          all canvas rendering
   multiplayer.js   co-op, versus, Daemons (PeerJS)
   screens.js       start screens, tutorial, pause, save backup
+  online.js        world leaderboard (Supabase REST)
   gamepad.js       game controllers (Gamepad API)
   main.js          the requestAnimationFrame loop
 pad.html         — the phone controller for co-op
@@ -44,6 +45,7 @@ audio/
   destruction.mp3  — aggressive theme, plays during gameplay
   nocherandom.mp3  — THE RIFT
   cuerpoacido.mp3  — boss fights
+supabase/        — world leaderboard schema + setup guide
 tests/           — headless browser tests (see tests/README.md)
 ```
 
@@ -431,7 +433,18 @@ Every finished run goes through `addToBoard()` from `recordRunResult()`
 New-Game-Plus run, `D7` in the Rift), rank letter and ship class; results
 screens say `NEW #1 ON THE LEADERBOARD!` / `LEADERBOARD #n`. Menu →
 LEADERBOARD (`renderBoard()`) opens on the mode just played and highlights
-the latest entry. An online board would hook into `addToBoard()`.
+the latest entry. Its THIS DEVICE / WORLD switch shows the online board.
+
+**World leaderboard** — `src/online.js` posts every counted run to a
+Supabase table (`supabase/schema.sql`, setup in `supabase/README.md`) with
+plain `fetch` against the REST API and Supabase's publishable key
+(`ONLINE`); row-level security allows reading and adding only. Results add
+`WORLD #n` (a count of better scores) to the leaderboard line. Runs that
+can't be sent wait in the save (`vortex-pending-scores`) and go out with
+the next run or the next launch. Names are cleaned to the pixel font's
+characters (`cleanName()`). Local copies (localhost, file://) don't post
+to the real board; tests point at `tests/scores-server.js` with
+`?scores=`.
 
 **Install + offline** — `manifest.webmanifest` (fullscreen, icons in
 `img/icons/`, drawn by script in the game's style) makes VORTEX installable

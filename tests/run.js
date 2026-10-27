@@ -53,6 +53,7 @@ function portBusy(port) {
 (async () => {
   const servers = [];
   if (!(await portBusy(8765))) servers.push(await require('./static-server').start());
+  if (!(await portBusy(8790))) servers.push(await require('./scores-server').start());
   if (files.some(f => MULTIPLAYER.some(m => f.includes(m))) && !(await portBusy(9000))) {
     try { servers.push(await require('./peer-server').start()); }
     catch (err) { console.log('(no local peer server: ' + err.message + ' - run npm install in tests/)'); }
