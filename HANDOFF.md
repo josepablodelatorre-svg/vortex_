@@ -25,20 +25,11 @@ the architecture of each piece.
 Parked for later: monetisation (ideas: cosmetics only, optional rewarded
 "revive once" ads, supporter pack) and the iPhone / Android / Steam ports.
 
-## How changes were verified in this session (recommend continuing this)
-No test suite — instead:
-1. Extract the `<script>` tag's contents to a standalone `.js` file.
-2. `new Function(code)` in Node to catch syntax errors before ever
-   opening the file in a browser.
-3. For logic changes, stub `document`/`window`/`Audio`/`AudioContext`/
-   `requestAnimationFrame`/`localStorage`/timers in a Node `vm` context
-   (important: use `vm.createContext` + `vm.runInContext`, NOT a bare
-   `eval` — top-level `let`/`const` declared inside a direct `eval()` do
-   not leak out to later calls, but they DO persist across multiple
-   `vm.runInContext` calls against the same context, which is what makes
-   it possible to drive the game state step by step and assert on it).
-   This caught the original boss-null-dereference bug and would catch
-   similar races again.
+## How changes are verified
+`cd tests && npm install && npm test` runs the headless browser suite
+(Playwright, 27 files, about 6 minutes) against a local server; see
+`tests/README.md`. `node --check src/<file>.js` catches syntax errors
+first.
 
 ## Open ideas, not started (see README's last section)
 - Procedurally generated/seedable camera path.
@@ -46,16 +37,15 @@ No test suite — instead:
   `grid` formation enemy.
 
 ## Gotchas worth knowing before touching things
-- The embedded base64 NEMO logo makes `index.html` large enough that
-  Claude's own `Read` tool can choke on it ("exceeds maximum allowed
-  tokens") even with offset/limit. Use `sed -n 'X,Yp' index.html` via
-  shell instead for viewing, and extract the `<script>` body to a
-  separate file (see above) rather than reading the whole HTML file.
+- The game is split into plain scripts in `src/` sharing one global
+  scope. Code that runs at load time can only use what earlier files (or
+  its own file) declared; functions called from events and the loop can
+  live anywhere.
 - Both the DOM overlay click handlers AND the canvas's own mousedown/
   touchstart listeners can trigger `startGame()` — if you add new state
   transitions, make sure both paths agree on the `continuing` argument,
   or clicking off-center silently drops New-Game-Plus escalation (this
   exact bug happened once already).
-- The `audio/` MP3s must stay next to
-  `index.html` (relative path) — don't let a repackage step leave them
+- `style.css`, `src/`, `lib/`, `img/` and `audio/` must stay next to
+  `index.html` (relative paths) — don't let a repackage step leave them
   behind.

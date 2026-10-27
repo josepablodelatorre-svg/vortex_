@@ -8,24 +8,47 @@ no bundler, no external JS frameworks — plain HTML5 Canvas2D + Web Audio.
 ## Running it
 
 Just open `index.html` directly in a browser (double-click it, or
-`file://` it). No server, no npm install, nothing to build. The `audio/`
-folder must sit next to `index.html` — the game loads the soundtrack by
-relative path (`audio/*.mp3`).
+`file://` it). No server, no npm install, nothing to build. Everything it
+loads is by relative path, so `style.css`, `src/`, `lib/`, `img/` and
+`audio/` must sit next to it.
 
 ## File layout
 
 ```
-index.html   — everything: HTML, CSS, game logic, all in one file
+index.html       — the page: HUD, title screens, overlays (markup only)
+style.css        — all styles
+src/             — the game, as plain scripts loaded in this order:
+  save.js          the one versioned save entry (store), flickering title
+  audio.js         settings (volume, glow, vibration), SFX, music, analyser
+  progression.js   game state, track items, coins, missions, checkpoints,
+                   the Rift, level objectives
+  world.js         difficulty, tunnel + camera path, entity lists, projection
+  environments.js  tube / trench / asteroids / space / planet surface
+  input.js         mouse, touch, keyboard, cockpit view
+  meta.js          CRT, achievements, palettes, ship classes, clips, daily
+                   tunnel, ranks, best scores, screen shake
+  flow.js          starting/ending runs, spawning, commander comms
+  pilot.js         jack-in intro, level start, bombs, warp, pickups
+  update.js        update(dt), the per-frame simulation
+  draw.js          all canvas rendering
+  multiplayer.js   co-op, versus, Daemons (PeerJS)
+  screens.js       start screens, tutorial, pause
+  main.js          the requestAnimationFrame loop
+pad.html         — the phone controller for co-op
+lib/             — PeerJS + qrcode-generator (MIT, see LICENSES.txt)
+img/nemo-logo.png
 audio/
   garden.mp3       — calm theme, plays on title/results screens
   destruction.mp3  — aggressive theme, plays during gameplay
   nocherandom.mp3  — THE RIFT
   cuerpoacido.mp3  — boss fights
+tests/           — headless browser tests (see tests/README.md)
 ```
 
-The NEMO INC. logo on the title screen is embedded directly in
-`index.html` as a base64 PNG (no separate asset file) — that's why the
-HTML file itself is large (~100KB+ of that is the inlined logo).
+The scripts are classic `<script src>` files, not modules: they share one
+global scope, exactly as when they were one inline script, so a top-level
+`let` in one file is visible in the others. Order matters only for code
+that runs at load time; everything else runs after all files have loaded.
 
 ## Core concept
 
@@ -35,7 +58,7 @@ sync with procedural WebAudio sound effects. The camera "flies" through a
 banked, swirling path toward an accelerating event horizon — real
 left/right/up/down turns, not just a static tube.
 
-## Architecture (all inside the one `<script>` tag in index.html)
+## Architecture (the scripts in `src/`)
 
 **Camera / tunnel geometry**
 - `pointOnRing(angle, z, opts)` — projects polar coords (angle around the

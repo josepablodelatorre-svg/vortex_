@@ -1,0 +1,1118 @@
+/* VORTEX styles (loaded by index.html) */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #000;
+  overflow: hidden;
+  height: 100%;
+  cursor: crosshair;
+}
+canvas {
+  display: block;
+}
+body:not(.inrun) #hud { display: none !important; }
+#hud {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  color: #a855ff;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  line-height: 1.5;
+  text-shadow: 0 0 8px #a855ff;
+  pointer-events: none;
+  user-select: none;
+  background: rgba(10, 0, 24, 0.5);
+  border: 1px solid rgba(168, 85, 255, 0.35);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 220px;
+}
+#hudtop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+#hudkills {
+  opacity: 0.8;
+  font-size: 10px;
+}
+#hudrun {
+  display: none;
+  font-size: 10px;
+  color: #ff5533;
+  text-shadow: 0 0 6px #ff5533;
+}
+#hudtriple {
+  display: none;
+  white-space: pre-line;
+  font-size: 10px;
+  color: #fff6c8;
+  text-shadow: 0 0 6px #ffffff;
+}
+#hudbars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(168, 85, 255, 0.25);
+}
+.hudrow {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+#bossrow {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+#bossbar {
+  flex: 1;
+  width: auto;
+  height: 10px;
+  border: 1px solid #ff5533;
+  box-shadow: 0 0 10px rgba(255,85,51,0.7);
+  padding: 2px;
+}
+#bossfill {
+  height: 100%;
+  width: 100%;
+  background: #ff5533;
+  transition: width 0.2s linear;
+}
+#levelbanner {
+  position: fixed;
+  top: 22%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #3c8aff;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 20px;
+  letter-spacing: 4px;
+  text-shadow: 0 0 18px #3c8aff;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+#hullbar {
+  flex: 1;
+  width: auto;
+  height: 10px;
+  border: 1px solid #a855ff;
+  box-shadow: 0 0 8px rgba(168,85,255,0.6);
+  padding: 2px;
+}
+/* plasma shield (recharges, takes hits first) and power (fills with kills) */
+.minibar {
+  flex: 1;
+  height: 6px;
+  padding: 2px;
+  border: 1px solid #22ddff;
+}
+.minibar.power { border-color: #ffe14d; }
+#plasmafill, #powerfill {
+  height: 100%;
+  width: 100%;
+  background: #22ddff;
+  box-shadow: 0 0 6px #22ddff;
+}
+#powerfill { width: 0%; background: #ffe14d; box-shadow: 0 0 6px #ffe14d; }
+#plasmafill.over { background: #e8fdff; box-shadow: 0 0 10px #50e6ff; }
+/* cockpit view draws hull, plasma and power on the dashboard */
+body.cockpitview #hullrow, body.cockpitview #plasmarow, body.cockpitview #powerrow { display: none; }
+#powerfill.full { animation: cursorBlink 0.5s infinite; }
+#hullfill {
+  height: 100%;
+  width: 100%;
+  background: #3f6;
+  transition: width 0.2s linear, background 0.2s linear;
+}
+#damageflash {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255,30,30,0.35);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s linear;
+}
+/* Retro CRT overlay: scanlines + vignette + a faint flicker, pure CSS so
+   it costs nothing extra to render and needs no WebGL/shader pipeline.
+   Sits above everything (canvas, HUD, menus) and never blocks clicks. */
+/* Jack in: name field + button on the title, the full-screen digitize
+   sequence, and the live wireframe portrait in the HUD */
+#jackin {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+#pilotname {
+  width: 150px;
+  background: rgba(10, 0, 24, 0.6);
+  border: 1px solid #3f6;
+  color: #b9ffcb;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 9px 10px;
+  text-transform: uppercase;
+  outline: none;
+}
+#pilotname::placeholder { color: rgba(63, 255, 102, 0.4); }
+#jackinBtn {
+  background: #3f6;
+  border: 1px solid #3f6;
+  color: #000;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  padding: 9px 14px;
+  cursor: pointer;
+  box-shadow: 0 0 14px rgba(63, 255, 102, 0.6);
+}
+#jackinnote {
+  font-size: 7px !important;
+  margin: 8px 0 0 !important;
+  color: #3f6;
+  opacity: 0.55;
+}
+#digitize {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: none;
+  z-index: 990;
+}
+#portrait {
+  position: fixed;
+  left: 16px;
+  bottom: 96px;
+  width: 132px;
+  height: 100px;
+  border: 1px solid rgba(63, 255, 102, 0.45);
+  background: rgba(10, 0, 24, 0.6);
+  display: none;
+  pointer-events: none;
+  z-index: 5;
+}
+#crtOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+#crtOverlay.on { opacity: 1; }
+#crtScanlines {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.0) 0px,
+    rgba(0,0,0,0.0) 1px,
+    rgba(0,0,0,0.22) 2px,
+    rgba(0,0,0,0.22) 3px
+  );
+  mix-blend-mode: multiply;
+  animation: crtFlicker 0.12s infinite;
+}
+#crtVignette {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.55) 100%);
+}
+@keyframes crtFlicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.94; }
+}
+#crtToggle {
+  margin-top: 14px;
+  background: transparent;
+  border: 1px solid #3c8aff;
+  color: #3c8aff;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 8px 12px;
+  cursor: pointer;
+  text-shadow: 0 0 6px #3c8aff;
+}
+#viewToggle {
+  margin-top: 14px;
+  background: transparent;
+  border: 1px solid #ff8c28;
+  color: #ff8c28;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 8px 12px;
+  cursor: pointer;
+  text-shadow: 0 0 6px #ff8c28;
+}
+#langToggle {
+  margin-top: 14px;
+  margin-left: 8px;
+  background: transparent;
+  border: 1px solid #3f6;
+  color: #3f6;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 8px 12px;
+  cursor: pointer;
+  text-shadow: 0 0 6px #3f6;
+}
+#crtToggle.selected {
+  background: #3c8aff;
+  color: #000;
+  text-shadow: none;
+  box-shadow: 0 0 14px #3c8aff;
+}
+#titlebrand {
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.75;
+}
+#titlebrand img {
+  height: 46px;
+  width: auto;
+  display: block;
+  filter: drop-shadow(0 0 6px rgba(63,255,102,0.65));
+}
+#titlebrand span {
+  color: #3f6;
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-shadow: 0 0 6px #3f6;
+}
+#title {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  color: #3c8aff;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  text-align: center;
+  text-shadow: 0 0 16px #3c8aff;
+  user-select: none;
+  cursor: pointer;
+}
+#title h1 {
+  font-size: 40px;
+  letter-spacing: 8px;
+  margin: 0;
+}
+#title p {
+  font-size: 11px;
+  letter-spacing: 3px;
+  opacity: 0.7;
+  margin-top: 20px;
+}
+/* flickering, glitchy bitmap-terminal title characters */
+.flicker-char {
+  display: inline-block;
+  animation-name: charFlicker;
+  animation-iteration-count: infinite;
+  animation-timing-function: steps(1);
+}
+@keyframes charFlicker {
+  0%, 90% { opacity: 1; }
+  91% { opacity: 0.15; }
+  92% { opacity: 1; }
+  94% { opacity: 0.25; }
+  95% { opacity: 1; }
+  100% { opacity: 1; }
+}
+.flicker-char.underscore {
+  animation-name: cursorBlink;
+  animation-duration: 1s;
+}
+@keyframes cursorBlink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+#gameover {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #f0f;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  text-align: center;
+  text-shadow: 0 0 16px #f0f;
+  user-select: none;
+  display: none;
+}
+#gameover h1 {
+  font-size: 26px;
+  letter-spacing: 4px;
+  margin: 0;
+}
+#gameover p {
+  font-size: 12px;
+  letter-spacing: 1px;
+  margin-top: 18px;
+  opacity: 0.8;
+}
+#cleared {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #3f6;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  text-align: center;
+  text-shadow: 0 0 16px #3f6;
+  user-select: none;
+  display: none;
+}
+#cleared h1 {
+  font-size: 26px;
+  letter-spacing: 4px;
+  margin: 0;
+}
+#cleared p {
+  font-size: 12px;
+  letter-spacing: 1px;
+  margin-top: 18px;
+  opacity: 0.8;
+}
+#difficulty {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+#difficulty button {
+  background: transparent;
+  border: 1px solid #3c8aff;
+  color: #3c8aff;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 10px 14px;
+  cursor: pointer;
+  text-shadow: 0 0 6px #3c8aff;
+}
+#difficulty button.selected {
+  background: #3c8aff;
+  color: #000;
+  text-shadow: none;
+  box-shadow: 0 0 14px #3c8aff;
+}
+#besttag {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.75;
+  margin: 6px 0 0;
+  white-space: pre-line; /* the Rift record sits on its own line */
+  line-height: 1.8;
+}
+/* ship class picker (Spectre-style loadouts), same language as difficulty */
+#shipclass {
+  margin-top: 18px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+#shipclass button {
+  background: transparent;
+  border: 1px solid #3c8aff;
+  color: #3c8aff;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 8px;
+  letter-spacing: 1px;
+  padding: 8px 10px;
+  cursor: pointer;
+  text-shadow: 0 0 6px #3c8aff;
+}
+#shipclass button.selected {
+  background: #3c8aff;
+  color: #000;
+  text-shadow: none;
+  box-shadow: 0 0 14px #3c8aff;
+}
+#shippreview {
+  display: block;
+  margin: 10px auto 0;
+  width: 200px;
+  height: 110px;
+}
+/* run rank on the results screens: one huge letter + the stats behind it */
+.rank {
+  margin: 18px 0 6px;
+  font-size: 64px;
+  letter-spacing: 0;
+  line-height: 1;
+}
+.rank small {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 1px;
+  margin-top: 14px;
+  opacity: 0.75;
+  text-shadow: none;
+}
+.resultBtns {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.resultBtns button {
+  background: transparent;
+  border: 1px solid #ffe14d;
+  color: #ffe14d;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 9px 12px;
+  cursor: pointer;
+  text-shadow: 0 0 6px #ffe14d;
+}
+.resultBtns button:disabled { opacity: 0.35; cursor: default; }
+#dailyBtn {
+  display: block;
+  margin: 12px auto 0;
+  background: transparent;
+  border: 1px solid #ffe14d;
+  color: #ffe14d;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 9px 12px;
+  cursor: pointer;
+  text-shadow: 0 0 6px #ffe14d;
+}
+#dailyBtn.challenged { background: #ffe14d; color: #000; text-shadow: none; box-shadow: 0 0 14px #ffe14d; }
+#versusBtn {
+  display: block;
+  margin: 10px auto 0;
+  background: transparent;
+  border: 1px solid #ff8c28;
+  color: #ff8c28;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 9px 12px;
+  cursor: pointer;
+  text-shadow: 0 0 6px #ff8c28;
+}
+#cyclesBtn {
+  display: block;
+  margin: 10px auto 0;
+  background: transparent;
+  border: 1px solid #22ddff;
+  color: #22ddff;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 9px 12px;
+  cursor: pointer;
+  text-shadow: 0 0 6px #22ddff;
+}
+#lobbyStart {
+  display: none;
+  margin: 0 auto 14px;
+  background: #22ddff;
+  border: none;
+  color: #000;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 2px;
+  padding: 12px 18px;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(34, 221, 255, 0.6);
+}
+#lobbyAccept {
+  display: none;
+  margin: 0 auto 14px;
+  background: #ff8c28;
+  border: none;
+  color: #000;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 2px;
+  padding: 12px 18px;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(255, 140, 40, 0.6);
+}
+/* versus: the opponent's live hull + score, top centre */
+#vspanel {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 9px;
+  color: #ff8c28;
+  text-shadow: 0 0 6px #ff8c28;
+  background: rgba(10, 0, 24, 0.6);
+  border: 1px solid rgba(255, 140, 40, 0.5);
+  padding: 8px 12px;
+  z-index: 5;
+}
+#vshull { width: 90px; height: 8px; border: 1px solid #ff8c28; padding: 2px; }
+#vshullfill { height: 100%; width: 100%; background: #ff8c28; }
+#coopBtn {
+  display: block;
+  margin: 10px auto 0;
+  background: transparent;
+  border: 1px solid #3f6;
+  color: #3f6;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 9px 12px;
+  cursor: pointer;
+  text-shadow: 0 0 6px #3f6;
+}
+/* co-op lobby: the QR code phones scan to join */
+#lobby {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 32px));
+  box-sizing: border-box;
+  background: rgba(5, 0, 15, 0.94);
+  border: 1px solid #3f6;
+  box-shadow: 0 0 24px rgba(63, 255, 102, 0.3);
+  padding: 20px;
+  text-align: center;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  color: #3f6;
+  display: none;
+  z-index: 1000; /* above the CRT scanlines, which would break QR scanning */
+}
+#lobby h2 { font-size: 14px; letter-spacing: 3px; margin: 0 0 12px; text-shadow: 0 0 10px #3f6; }
+#lobby p { font-size: 8px; line-height: 1.8; margin: 8px 0; opacity: 0.8; }
+#qrbox {
+  display: inline-block;
+  background: #fff;
+  padding: 8px;
+  margin: 8px 0;
+  color: #000;
+  font-size: 8px;
+  min-width: 120px;
+  min-height: 120px;
+  line-height: 120px;
+}
+#qrbox svg { display: block; }
+#lobbylink { word-break: break-all; }
+#lobbyplayers { font-size: 9px; line-height: 2; margin: 10px 0; }
+#lobbyClose {
+  background: #3f6;
+  border: none;
+  color: #000;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 2px;
+  padding: 10px 18px;
+  cursor: pointer;
+}
+/* the start is a set of screens: splash -> menu -> hangar / multi / settings */
+#title .screen { display: none; }
+#title .screen.active { display: block; animation: screenIn 0.25s ease-out; }
+@keyframes screenIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+#title h2 {
+  font-size: 16px;
+  letter-spacing: 4px;
+  margin: 0 0 16px;
+}
+#tagline { font-size: 10px !important; letter-spacing: 3px !important; opacity: 0.85 !important; margin-top: 14px !important; }
+#presshint {
+  font-size: 13px !important;
+  margin-top: 34px !important;
+  opacity: 1 !important;
+  animation: cursorBlink 1.2s infinite;
+}
+#loadout { font-size: 8px !important; margin: 0 0 14px !important; }
+#title .menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+#title .menu button, #title .back {
+  min-width: 260px;
+  background: transparent;
+  border: 1px solid #3c8aff;
+  color: #3c8aff;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  padding: 12px 16px;
+  cursor: pointer;
+  text-shadow: 0 0 6px #3c8aff;
+  margin: 0;
+}
+#title .menu button:hover, #title .back:hover { background: rgba(60,138,255,0.18); }
+#title .menu button.primary {
+  background: #3c8aff;
+  color: #000;
+  text-shadow: none;
+  font-size: 13px;
+  padding: 15px 16px;
+  box-shadow: 0 0 18px #3c8aff;
+}
+#title .back { min-width: 0; margin-top: 22px; font-size: 9px; }
+#title .menunote { font-size: 7px !important; margin: -4px 0 6px !important; opacity: 0.6 !important; }
+/* notes under a list (missions, upgrades) need room, not a tuck-under */
+#streaktag + .menunote, #shoplist + .menunote { margin: 12px 0 0 !important; }
+#toggles {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+#toggles button { margin-top: 14px; margin-left: 0; }
+#sliders { display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 18px; }
+#sliders label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #c9a0ff;
+}
+#sliders label span { width: 56px; text-align: left; }
+#sliders input[type=range] { width: 170px; accent-color: #a855ff; }
+#glowToggle, #vibeToggle, #tutorialBtn {
+  margin-top: 14px;
+  background: transparent;
+  border: 1px solid #a855ff;
+  color: #c9a0ff;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+#missionmult, #streaktag { font-size: 10px !important; color: #3f6; text-shadow: 0 0 8px #3f6; opacity: 1 !important; margin: 0 0 12px !important; }
+#streaktag { color: #ff8c28; text-shadow: 0 0 8px #ff8c28; margin: 14px 0 0 !important; }
+#missionlist { display: flex; flex-direction: column; gap: 8px; max-width: 460px; margin: 0 auto 10px; }
+.missionrow { border: 1px solid rgba(60, 138, 255, 0.35); padding: 9px 10px; font-size: 9px; letter-spacing: 1px; text-align: left; }
+.missionrow.done { border-color: #3f6; color: #3f6; }
+.missionbar { height: 5px; border: 1px solid currentColor; margin-top: 7px; padding: 1px; }
+.missionbar div { height: 100%; background: currentColor; }
+#hudcoins { float: right; color: #ffd23f; text-shadow: 0 0 6px #ffd23f; }
+#wallet { font-size: 12px !important; color: #ffd23f; text-shadow: 0 0 8px #ffd23f; opacity: 1 !important; margin: 0 0 14px !important; }
+#shoplist { display: flex; flex-direction: column; gap: 8px; max-width: 460px; margin: 0 auto 14px; }
+.shoprow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 10px;
+  align-items: center;
+  text-align: left;
+  border: 1px solid rgba(60, 138, 255, 0.35);
+  padding: 8px 10px;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+.shoprow .what { opacity: 0.6; font-size: 7px; grid-column: 1; }
+.shoprow .pips { color: #ffd23f; letter-spacing: 3px; }
+.shoprow button {
+  grid-row: 1 / span 3;
+  grid-column: 2;
+  background: transparent;
+  border: 1px solid #ffd23f;
+  color: #ffd23f;
+  font-family: inherit;
+  font-size: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.shoprow button:disabled { opacity: 0.35; cursor: default; }
+#toast {
+  position: fixed;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 10px;
+  line-height: 1.9;
+  text-align: center;
+  color: #ffe14d;
+  text-shadow: 0 0 10px #ffe14d;
+  background: rgba(10, 0, 24, 0.75);
+  border: 1px solid #ffe14d;
+  padding: 10px 16px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 6;
+  white-space: pre-line;
+}
+#shipcolor button.locked {
+  opacity: 0.3;
+  border-style: dashed;
+  cursor: not-allowed;
+}
+#achievetag {
+  font-size: 7px !important;
+  margin: 8px 0 0 !important;
+  opacity: 0.6;
+}
+#shipclassdesc {
+  font-size: 8px !important;
+  letter-spacing: 1px;
+  margin: 10px 0 0 !important;
+  opacity: 0.75;
+  min-height: 1em;
+}
+#hudzap {
+  font-size: 10px;
+  color: #ff78ff;
+  text-shadow: 0 0 6px #ff78ff;
+}
+/* Mission briefing (from X): shown for a few seconds as each level opens */
+/* first-run tutorial coach: one instruction at a time */
+#coach {
+  position: fixed;
+  top: 31%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(500px, calc(100vw - 32px));
+  box-sizing: border-box;
+  display: none;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  text-align: center;
+  background: rgba(10, 0, 24, 0.75);
+  border: 1px solid rgba(255, 225, 77, 0.6);
+  box-shadow: 0 0 18px rgba(255, 225, 77, 0.25);
+  padding: 12px 14px;
+  z-index: 6;
+  user-select: none;
+  pointer-events: none; /* taps go through to the game; only SKIP is a button */
+}
+#coachstep { font-size: 8px; color: #ffe14d; opacity: 0.8; margin-bottom: 8px; letter-spacing: 2px; }
+#coachtext { font-size: 11px; line-height: 1.7; color: #fff6c8; text-shadow: 0 0 8px #ffe14d; }
+#coachskip {
+  margin-top: 10px;
+  background: transparent;
+  border: 1px solid rgba(255, 225, 77, 0.5);
+  color: #ffe14d;
+  font-family: inherit;
+  font-size: 8px;
+  letter-spacing: 2px;
+  padding: 7px 10px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+#briefing {
+  position: fixed;
+  top: 31%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(520px, calc(100vw - 32px));
+  box-sizing: border-box;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  text-align: center;
+  background: rgba(10, 0, 24, 0.7);
+  border: 1px solid rgba(63, 255, 102, 0.55);
+  box-shadow: 0 0 18px rgba(63, 255, 102, 0.25);
+  padding: 14px 16px;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 5;
+}
+#briefingtitle {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: #3f6;
+  text-shadow: 0 0 8px #3f6;
+  margin-bottom: 10px;
+}
+#briefingtext {
+  font-size: 9px;
+  line-height: 1.8;
+  color: #b9ffcb;
+}
+/* Commander transmissions: a small terminal box, bottom-left, typed out */
+#comms {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  max-width: min(360px, 42vw);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  background: rgba(10, 0, 24, 0.6);
+  border: 1px solid rgba(63, 255, 102, 0.45);
+  padding: 9px 12px;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.15s linear;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  z-index: 5;
+}
+#comms.hacked {
+  border-color: rgba(255, 42, 42, 0.7);
+  box-shadow: 0 0 14px rgba(255, 42, 42, 0.35);
+}
+#comms.hacked #commslabel { color: #ff2a2a; opacity: 1; }
+#comms.hacked #commstext { color: #ffb3b3; text-shadow: 0 0 6px #ff2a2a; }
+#commslabel {
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: #3f6;
+  opacity: 0.7;
+}
+#commstext {
+  font-size: 10px;
+  line-height: 1.6;
+  color: #b9ffcb;
+  text-shadow: 0 0 6px #3f6;
+}
+/* Superzapper button: bottom-right, mainly for touch screens */
+#zapBtn {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: none;
+  background: rgba(10, 0, 24, 0.6);
+  border: 1px solid #ff78ff;
+  color: #ff78ff;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  padding: 14px 16px;
+  cursor: pointer;
+  text-shadow: 0 0 8px #ff78ff;
+  box-shadow: 0 0 12px rgba(255,120,255,0.5);
+  z-index: 5;
+}
+/* pause: under the radar, only during a run */
+#pauseBtn {
+  position: fixed;
+  right: 18px;
+  top: 150px;
+  display: none;
+  background: rgba(10, 0, 24, 0.6);
+  border: 1px solid rgba(168, 85, 255, 0.6);
+  color: #c9a0ff;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 10px;
+  padding: 9px 10px;
+  cursor: pointer;
+  z-index: 5;
+}
+body.inrun.playing #pauseBtn { display: block; }
+#pause {
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: rgba(5, 0, 15, 0.9);
+  color: #c9a0ff;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  text-align: center;
+  text-shadow: 0 0 12px #a855ff;
+  z-index: 60;
+}
+body.paused #pause { display: flex; }
+#pause h1 { font-size: 26px; letter-spacing: 6px; margin: 0 0 8px; }
+#pause p { font-size: 9px; opacity: 0.7; margin: 0; }
+#pause button {
+  min-width: 200px;
+  background: rgba(10, 0, 24, 0.8);
+  border: 1px solid #a855ff;
+  color: #e6d4ff;
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 2px;
+  padding: 14px 18px;
+  cursor: pointer;
+}
+#pause #resumeBtn { border-color: #3f6; color: #b9ffcb; box-shadow: 0 0 14px rgba(63,255,102,0.45); }
+#lockBtn {
+  position: fixed;
+  right: 16px;
+  bottom: 84px;
+  display: none;
+  background: rgba(10, 0, 24, 0.6);
+  border: 1px solid #ffe14d;
+  color: #ffe14d;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  padding: 14px 16px;
+  cursor: pointer;
+  text-shadow: 0 0 8px #ffe14d;
+  box-shadow: 0 0 14px rgba(255,225,77,0.6);
+  animation: lockPulse 0.8s ease-in-out infinite;
+  z-index: 5;
+}
+@keyframes lockPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+#zapBtn.spent {
+  opacity: 0.25;
+  box-shadow: none;
+}
+#shipcolor {
+  margin-top: 18px;
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  align-items: center;
+}
+#shipcolor .scLabel {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 8px;
+  letter-spacing: 1px;
+  opacity: 0.6;
+  margin-right: 4px;
+}
+#shipcolor button {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+#shipcolor button.selected {
+  box-shadow: 0 0 10px currentColor;
+}
+/* THE RIFT entry buttons: crimson so they read as a different, darker
+   mode than the blue campaign options. The title one stays hidden until
+   the campaign has been beaten once. */
+.riftBtn {
+  display: block;
+  margin: 18px auto 0;
+  background: transparent;
+  border: 1px solid #ff1e3c;
+  color: #ff5570;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  padding: 10px 14px;
+  cursor: pointer;
+  text-shadow: 0 0 8px #ff1e3c;
+  box-shadow: 0 0 10px rgba(255,30,60,0.35);
+}
+.riftBtn:hover {
+  background: #ff1e3c;
+  color: #000;
+  text-shadow: none;
+}
+#riftStart { display: none; }
+#continueBtn { display: none; }
+#contFromLost { display: none; color: #3f6; border-color: #3f6; text-shadow: 0 0 8px #3f6; box-shadow: 0 0 10px rgba(63,255,102,0.35); }
+#title .menu #riftStart { color: #ff5570; border-color: #ff1e3c; text-shadow: 0 0 8px #ff1e3c; }
+#title .menu #dailyBtn { color: #ffe14d; border-color: #ffe14d; text-shadow: 0 0 6px #ffe14d; }
+/* ---------- phones: compact everything, respect the notch ---------- */
+@media (max-width: 600px), (max-height: 500px) {
+  #title { width: calc(100vw - 24px); }
+  #title h1 { font-size: 26px; letter-spacing: 4px; margin-top: 6px; }
+  #title p { font-size: 8px; letter-spacing: 1px; }
+  #besttag { font-size: 7px !important; }
+  #shippreview { width: 160px; height: 88px; margin-top: 4px; }
+  #shipclass { gap: 6px; margin-top: 8px; }
+  #shipclass button { font-size: 7px; padding: 7px 7px; }
+  #pilotname { width: 120px; font-size: 9px; }
+  #jackinBtn { font-size: 9px; padding: 9px 10px; }
+  #presshint { font-size: 11px !important; }
+  [data-screen="splash"] h1 { font-size: 34px; letter-spacing: 5px; }
+  #tagline { font-size: 8px !important; letter-spacing: 1px !important; }
+  #title .menu button { min-width: 0; width: 100%; max-width: 320px; font-size: 9px; padding: 11px 10px; }
+  #title .menu button.primary { font-size: 11px; }
+  #title h2 { font-size: 13px; }
+  #difficulty button { font-size: 8px; padding: 8px 10px; }
+  #shipcolor { gap: 9px; }
+  #shipcolor button { width: 16px; height: 16px; }
+  #titlebrand { margin-top: 14px; }
+  #titlebrand img { height: 32px; }
+  #hud {
+    top: calc(8px + env(safe-area-inset-top));
+    left: calc(8px + env(safe-area-inset-left));
+    font-size: 8px;
+    padding: 7px 9px;
+    gap: 5px;
+    min-width: 150px;
+  }
+  #hudkills, #hudrun, #hudtriple, #hudzap { font-size: 7px; }
+  #hudbars { gap: 4px; padding-top: 4px; }
+  #hullbar { height: 7px; }
+  .minibar { height: 4px; }
+  .hudrow { grid-template-columns: 30px 1fr; gap: 5px; }
+  #levelbanner { font-size: 12px; letter-spacing: 2px; top: 24%; width: calc(100vw - 32px); text-align: center; }
+  #briefing { top: 30%; padding: 10px 12px; }
+  #briefingtitle { font-size: 10px; margin-bottom: 7px; }
+  #briefingtext { font-size: 7px; line-height: 1.7; }
+  /* comms move to the top, under the HUD, so they never cover the ship */
+  #comms {
+    left: calc(8px + env(safe-area-inset-left));
+    right: calc(8px + env(safe-area-inset-right));
+    top: calc(142px + env(safe-area-inset-top));
+    bottom: auto;
+    max-width: none;
+    padding: 6px 9px;
+    gap: 4px;
+  }
+  #commslabel { font-size: 6px; }
+  #commstext { font-size: 8px; line-height: 1.5; }
+  #portrait {
+    left: auto;
+    right: calc(8px + env(safe-area-inset-right));
+    top: calc(206px + env(safe-area-inset-top));
+    bottom: auto;
+    width: 88px;
+    height: 67px;
+  }
+  #lockBtn {
+    right: calc(12px + env(safe-area-inset-right));
+    bottom: calc(68px + env(safe-area-inset-bottom));
+    font-size: 10px;
+    padding: 12px 14px;
+  }
+  #zapBtn {
+    right: calc(12px + env(safe-area-inset-right));
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    font-size: 10px;
+    padding: 12px 14px;
+  }
+  #gameover h1, #cleared h1 { font-size: 18px; letter-spacing: 2px; }
+  #gameover p, #cleared p { font-size: 8px; letter-spacing: 1px; line-height: 1.8; }
+  #gameover, #cleared { width: calc(100vw - 32px); }
+  .rank { font-size: 46px; margin: 12px 0 4px; }
+  .rank small { font-size: 7px; }
+  .resultBtns button { font-size: 8px; padding: 8px 10px; }
+  #toast { font-size: 8px; width: calc(100vw - 48px); box-sizing: border-box; }
+  #vspanel { top: auto; bottom: calc(14px + env(safe-area-inset-bottom)); font-size: 7px; }
+  #vshull { width: 60px; }
+}
