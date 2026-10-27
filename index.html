@@ -503,6 +503,17 @@ let musicShimmer = 0;  // 0..1, quicker: bright high-end texture
 let swellRings = [];   // { startTime } rings drifting in from the far wall
 let swellRingTimer = 0;
 const SWELL_RING_SPEED = 0.5; // z units per second: a slow, ambient drift
+// Rutt-Etra history: the analog video synth displaced each scan line by
+// the signal. Here the tunnel rings are the scan lines: every
+// RUTT_ROW_INTERVAL a downsampled spectrum row is pushed onto the far end
+// of the tunnel and rolls toward the player, so the soundtrack becomes a
+// moving topography. Empty (and invisible) without the analyser.
+const RUTT_BINS = 48;
+const RUTT_ROWS = 24;
+const RUTT_ROW_INTERVAL = 0.055;
+const RUTT_SAMPLES = 64; // ring sample density while the effect is live
+let ruttHistory = []; // newest first: [0] is at the event horizon
+let ruttRowTimer = 0;
 const musicBands = {
   mid: { lo: 0, hi: 0, primed: false },
   high: { lo: 0, hi: 0, primed: false }
@@ -542,6 +553,42 @@ function normaliseBand(band, x, dt) {
   return Math.max(0, Math.min(1, (x - band.lo) / Math.max(0.12, band.hi - band.lo)));
 }
 
+function pushRuttRow(dt) {
+  ruttRowTimer -= dt;
+  if (ruttRowTimer > 0) return;
+  ruttRowTimer = RUTT_ROW_INTERVAL;
+  // log-spaced bins from ~280Hz to ~11kHz, squared for contrast so quiet
+  // frequencies lie flat and the strong ones stand up as ridges
+  const row = new Float32Array(RUTT_BINS);
+  const lo = 6, hi = 240;
+  for (let i = 0; i < RUTT_BINS; i++) {
+    const a = Math.floor(lo * Math.pow(hi / lo, i / RUTT_BINS));
+    const b = Math.max(a + 1, Math.floor(lo * Math.pow(hi / lo, (i + 1) / RUTT_BINS)));
+    let sum = 0;
+    for (let k = a; k < b; k++) sum += musicFreq[k];
+    const v = sum / ((b - a) * 255);
+    row[i] = v * v;
+  }
+  ruttHistory.unshift(row);
+  if (ruttHistory.length > RUTT_ROWS) ruttHistory.pop();
+}
+
+// How far (0..~1) the Rutt-Etra signal pushes the ring at this depth and
+// angle out from the tunnel's centre. Mirrored left/right: low frequencies
+// at the top of the ring, highs at the bottom.
+function ruttDisplacement(angle, z) {
+  if (ruttHistory.length < 2) return 0;
+  const rowPos = (1 - z) * (RUTT_ROWS - 1);
+  const r0 = Math.min(ruttHistory.length - 1, Math.floor(rowPos));
+  const r1 = Math.min(ruttHistory.length - 1, r0 + 1);
+  const rf = rowPos - Math.floor(rowPos);
+  const u = Math.abs(normalizeAngle(angle)) / Math.PI * (RUTT_BINS - 1);
+  const b0 = Math.floor(u), b1 = Math.min(RUTT_BINS - 1, b0 + 1), bf = u - b0;
+  const v0 = ruttHistory[r0][b0] * (1 - bf) + ruttHistory[r0][b1] * bf;
+  const v1 = ruttHistory[r1][b0] * (1 - bf) + ruttHistory[r1][b1] * bf;
+  return v0 * (1 - rf) + v1 * rf;
+}
+
 function updateMusicMood(dt) {
   if (!musicAnalyser) return;
   musicAnalyser.getByteFrequencyData(musicFreq);
@@ -549,6 +596,7 @@ function updateMusicMood(dt) {
   const mid = normaliseBand(musicBands.mid, bandAverage(6, 60), dt);
   const high = normaliseBand(musicBands.high, bandAverage(60, 250), dt);
   musicSwell += (mid - musicSwell) * Math.min(1, dt * 1.2);
+  pushRuttRow(dt);
   musicShimmer += (high - musicShimmer) * Math.min(1, dt * 4);
 
   // the fuller the music, the more often a soft ring drifts in from the
@@ -1331,6 +1379,7 @@ function startGame(continuing, mode) {
   powerups = [];
   particles = [];
   swellRings = [];
+  ruttHistory = [];
   bitBursts = [];
   hitLabels = [];
   pulses = [];
@@ -1983,15 +2032,33 @@ function drawTunnel() {
     ctx.stroke();
   }
 
-  // concentric rings, scrolling, accelerating toward the event horizon
+  // concentric rings, scrolling, accelerating toward the event horizon.
+  // With music analysis live they double as Rutt-Etra scan lines, pushed
+  // outward by the spectrum history rolling down the tunnel.
   const offset = (t * effectiveTunnelSpeed()) % RING_SPACING;
+  const rutt = ruttHistory.length >= 2;
+  const samples = rutt ? RUTT_SAMPLES : RING_SAMPLES;
   for (let i = -1; i <= RING_COUNT; i++) {
     let z = i / RING_COUNT + offset;
     if (z > 1 || z < 0) continue;
+    // this ring's own centre (it shifts with the path bend), for pushing outward
+    let c = null;
+    if (rutt) {
+      const top = pointOnRing(0, z), bottom = pointOnRing(Math.PI, z);
+      c = { x: (top.x + bottom.x) / 2, y: (top.y + bottom.y) / 2 };
+    }
     ctx.beginPath();
-    for (let s = 0; s <= RING_SAMPLES; s++) {
-      const angle = (s / RING_SAMPLES) * Math.PI * 2;
+    for (let s = 0; s <= samples; s++) {
+      const angle = (s / samples) * Math.PI * 2;
       const pt = pointOnRing(angle, z);
+      if (rutt) {
+        // push the point away from the ring's centre, scaled to its size
+        const d = ruttDisplacement(angle, z) * pt.r * 0.22;
+        const dx = pt.x - c.x, dy = pt.y - c.y;
+        const len = Math.hypot(dx, dy) || 1;
+        pt.x += dx / len * d;
+        pt.y += dy / len * d;
+      }
       if (s === 0) ctx.moveTo(pt.x, pt.y);
       else ctx.lineTo(pt.x, pt.y);
     }

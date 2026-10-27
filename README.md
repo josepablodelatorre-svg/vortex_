@@ -172,6 +172,17 @@ fuller the music is. **Only works over http(s)** (e.g. GitHub Pages or
 because a cross-origin MediaElementSource outputs silence and would mute the
 music. The values then stay 0 and the game looks as it did before.
 
+**Rutt-Etra rings** — named after the analog video synth that displaced
+each scan line by the signal. `pushRuttRow()` (from `updateMusicMood`)
+pushes a log-spaced, squared 48-bin spectrum row every 55ms onto
+`ruttHistory` (newest = far end); `ruttDisplacement(angle, z)` reads it
+back by depth (so sound rolls down the tunnel toward the player) and by
+angle (mirrored: lows at the top of each ring, highs at the bottom).
+`drawTunnel()` pushes each ring point outward from the ring's centre by
+that amount while the history is live, at `RUTT_SAMPLES` density. Visual
+only; aim and hits never read it. Off on `file://` like the rest of the
+music analysis.
+
 **Sparks** — `burst()` particles start faster and slow down with drag in
 `update()`, drawn as streaks along their velocity instead of dots.
 
