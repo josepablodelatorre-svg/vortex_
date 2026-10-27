@@ -211,6 +211,15 @@ lane as lime `echo` bolts, fired by two lime ghost ships
 bright yellow and thicker; a lock turns the bullseye white-hot with a red
 centre and ticks.
 
+**Tron layer** — `derez()`/`derezAt()` burst wireframe voxel cubes
+(`voxels`, updated on every screen so the ship's own `endGame()` de-rez
+plays out under SIGNAL LOST; `shipDerezzed` hides the ship). Enemies,
+nova kills and bosses all de-rez. `CIRCUIT_TRACES` are fixed seeded
+circuit traces on the walls in (angle, z) space, with `circuitPulses`
+racing along them toward the horizon (more often as `musicSwell` rises,
+faster in a warp). `drawAimTrail()` draws the last 0.5s of the aim's path
+as a light-cycle ribbon around the tunnel.
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups

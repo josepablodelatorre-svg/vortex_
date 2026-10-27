@@ -1401,6 +1401,74 @@ let particles = []; // { x, y, vx, vy, life }
 // Flickering 0/1 bit characters that scatter when an enemy is destroyed
 let bitBursts = []; // { x, y, vx, vy, life, maxLife, char }
 
+// De-rez (from Tron): destroyed things break into wireframe voxel cubes
+// that tumble apart, fall and fade, instead of just sparking out.
+let voxels = []; // { x, y, vx, vy, size, life, maxLife, color, spin }
+let shipDerezzed = false;
+
+function derez(x, y, color, count, spread) {
+  for (let i = 0; i < count; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const speed = (40 + Math.random() * 160) * (spread || 1);
+    const life = 0.7 + Math.random() * 0.7;
+    voxels.push({
+      x: x + (Math.random() - 0.5) * 14 * (spread || 1),
+      y: y + (Math.random() - 0.5) * 14 * (spread || 1),
+      vx: Math.cos(ang) * speed,
+      vy: Math.sin(ang) * speed - 40,
+      size: 3 + Math.random() * 6 * (spread || 1),
+      life, maxLife: life, color,
+      spin: (Math.random() - 0.5) * 6
+    });
+  }
+  if (voxels.length > 900) voxels.splice(0, voxels.length - 900);
+}
+
+function derezAt(angle, z, color, count, spread) {
+  const pt = pointOnRing(angle, z);
+  derez(pt.x, pt.y, color, count, spread);
+}
+
+// Circuit grid (from Tron): fixed circuit traces etched along the tunnel
+// wall, in (angle, depth) space, with packets of light racing along them
+// toward the event horizon, more often the fuller the music is.
+const CIRCUIT_TRACES = (() => {
+  // deterministic pseudo-random, so the board looks the same every run
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const traces = [];
+  const LANES = 16;
+  for (let i = 0; i < LANES; i++) {
+    let angle = (i + 0.5) / LANES * Math.PI * 2;
+    let z = 0;
+    const pts = [[angle, z]];
+    while (z < 1) {
+      z = Math.min(1, z + 0.08 + rnd() * 0.16);   // straight run down the tube
+      pts.push([angle, z]);
+      if (z < 1 && rnd() < 0.6) {                  // a right-angle jog sideways
+        angle += (rnd() < 0.5 ? -1 : 1) * (0.06 + rnd() * 0.1);
+        pts.push([angle, z]);
+      }
+    }
+    traces.push(pts);
+  }
+  return traces;
+})();
+let circuitPulses = []; // { trace, u (0..1 along it), speed }
+let circuitPulseTimer = 0;
+
+// point a fraction u of the way along a trace polyline, in (angle, z)
+function tracePoint(pts, u) {
+  const segs = pts.length - 1;
+  const f = Math.max(0, Math.min(0.9999, u)) * segs;
+  const i = Math.floor(f), k = f - i;
+  return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * k, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * k];
+}
+
+// light trail: the last stretch of the aim's path, drawn as a ribbon of
+// light around the tunnel behind the aim line, like a light cycle's wall
+let aimTrail = []; // { t, angle }
+
 // "HIT!" callouts that pop up and fade at the kill location
 let hitLabels = []; // { x, y, vy, life, maxLife }
 
@@ -1610,6 +1678,11 @@ try {
   }
 } catch (e) { /* storage unavailable, keep the default */ }
 
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255);
+}
+
 function hexToRgba(hex, a) {
   const n = parseInt(hex.slice(1), 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
@@ -1781,6 +1854,8 @@ function startGame(continuing, mode) {
   swellRings = [];
   ruttHistory = [];
   bitBursts = [];
+  voxels = [];
+  shipDerezzed = false;
   hitLabels = [];
   pulses = [];
   spawnTimer = 0;
@@ -1821,6 +1896,9 @@ function updateRunUI() {
 }
 
 function endGame() {
+  // the ship de-rezzes into a big cloud of its own colour
+  derez(CX + shipX, H - Math.min(W, H) * 0.11, hexToRgb(SHIP_PALETTES[shipPaletteIndex].main), 160, 2.5);
+  shipDerezzed = true;
   state = 'gameover';
   document.getElementById('briefing').style.opacity = '0';
   updateZapUI();
@@ -2123,6 +2201,7 @@ function triggerNova() {
     score += Math.round((e.type === 'pentagram' ? 30 : 10) * (gameMode === 'rift' ? riftMultiplier() : 1));
     killCount += 1;
     burst(e.angle, e.z, { color: '255,120,255', bitColor: '#ff78ff', label: 'NOVA!', labelColor: '#ffb3ff' });
+    derezAt(e.angle, e.z, (ENEMY_COLORS[e.type] || ENEMY_COLORS.drone).rgb, 10, 1 - e.z * 0.6);
   }
   enemies = [];
   enemyBolts = [];
@@ -2210,6 +2289,23 @@ function updateTripleUI() {
 
 function update(dt) {
   t += dt;
+  for (const v of voxels) {
+    v.x += v.vx * dt;
+    v.y += v.vy * dt;
+    v.vx *= Math.pow(0.35, dt);
+    v.vy = v.vy * Math.pow(0.35, dt) + 260 * dt; // gravity: the bits fall away
+    v.life -= dt;
+  }
+  voxels = voxels.filter(v => v.life > 0);
+  circuitPulseTimer -= dt;
+  if (circuitPulseTimer <= 0) {
+    circuitPulses.push({ trace: Math.floor(Math.random() * CIRCUIT_TRACES.length), u: 0, speed: 0.35 + Math.random() * 0.35 });
+    circuitPulseTimer = 0.5 - 0.38 * musicSwell;
+  }
+  for (const cp of circuitPulses) cp.u += cp.speed * dt * (1 + (warpBoost() - 1) * 0.5);
+  circuitPulses = circuitPulses.filter(cp => cp.u < 1);
+  aimTrail.push({ t, angle: aimAngle });
+  while (aimTrail.length && aimTrail[0].t < t - 0.5) aimTrail.shift();
   updateComms(dt);
   tunnelTravel += effectiveTunnelSpeed() * warpBoost() * dt;
   updateMusicMood(dt);
@@ -2513,6 +2609,7 @@ function update(dt) {
           playHit();
           triggerShake(e.type === 'pentagram' ? 6 : 3, 0.12);
           burst(e.angle, e.z, e.type === 'pentagram' ? { color: '255,30,60', bitColor: '#ff1e3c', label: 'BANISHED!', labelColor: '#ff6680' } : undefined);
+          derezAt(e.angle, e.z, (ENEMY_COLORS[e.type] || ENEMY_COLORS.drone).rgb, e.type === 'pentagram' ? 26 : 14, 1 - e.z * 0.6);
         }
       }
     }
@@ -2560,6 +2657,7 @@ function update(dt) {
           updateBossUI();
           if (boss.hp <= 0) {
             const wasMini = boss.kind === 'mini';
+            derezAt(boss.angle, boss.z, '255,85,51', wasMini ? 60 : 140, 2.2);
             triggerShake(wasMini ? 16 : 26, wasMini ? 0.3 : 0.5);
             boss.alive = false;
             bossActive = false;
@@ -2758,9 +2856,11 @@ function draw() {
     drawParticles();
     drawBitBursts();
     drawHitLabels();
+    drawAimTrail();
     drawAimLine();
     drawEchoGhosts();
-    drawShip();
+    if (!shipDerezzed) drawShip();
+    drawVoxels();
     ctx.restore();
     if (state === 'playing') drawRadar();
   }
@@ -2912,6 +3012,8 @@ function drawTunnel() {
     }
     ctx.restore();
   }
+
+  drawCircuits();
 
   // pulse glow overlay on spokes (sample brightness at a few angles per pulse)
   if (pulses.length) {
@@ -3578,6 +3680,98 @@ function drawCores() {
     ctx.fill();
     ctx.restore();
   }
+}
+
+function drawCircuits() {
+  ctx.save();
+  // the etched traces, faint, with a solder pad at every jog
+  ctx.strokeStyle = 'rgba(80,230,255,0.13)';
+  ctx.fillStyle = 'rgba(80,230,255,0.22)';
+  ctx.lineWidth = 1;
+  for (const pts of CIRCUIT_TRACES) {
+    ctx.beginPath();
+    pts.forEach(([a, z], i) => {
+      const pt = pointOnRing(a, z);
+      if (i === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+    });
+    ctx.stroke();
+    for (let i = 1; i < pts.length - 1; i++) {
+      const pt = pointOnRing(pts[i][0], pts[i][1]);
+      const d = 4 * (1 - pts[i][1]) + 1;
+      ctx.fillRect(pt.x - d / 2, pt.y - d / 2, d, d);
+    }
+  }
+  // light packets racing along them toward the horizon, with a short tail
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+  for (const cp of circuitPulses) {
+    const pts = CIRCUIT_TRACES[cp.trace];
+    ctx.beginPath();
+    for (let k = 0; k <= 6; k++) {
+      const [a, z] = tracePoint(pts, cp.u - k * 0.012);
+      const pt = pointOnRing(a, z);
+      if (k === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+    }
+    const [, zHead] = tracePoint(pts, cp.u);
+    ctx.strokeStyle = `rgba(150,245,255,${0.85 * (1 - zHead) + 0.15})`;
+    ctx.shadowColor = '#50e6ff';
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 3 * (1 - zHead) + 1;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawAimTrail() {
+  if (state !== 'playing' || aimTrail.length < 2) return;
+  // a light-cycle wall around the tunnel, just inside the screen edge,
+  // fading out behind the aim line
+  const pal = SHIP_PALETTES[shipPaletteIndex];
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+  ctx.shadowColor = pal.glow;
+  ctx.shadowBlur = 14;
+  for (let i = 1; i < aimTrail.length; i++) {
+    const a0 = aimTrail[i - 1].angle, a1 = aimTrail[i].angle;
+    if (Math.abs(normalizeAngle(a1 - a0)) > 1) continue; // skip a wrap-around jump
+    const age = (t - aimTrail[i].t) / 0.5;
+    const p0 = pointOnRing(a0, 0.1, { visual: false });
+    const p1 = pointOnRing(a1, 0.1, { visual: false });
+    ctx.beginPath();
+    ctx.moveTo(p0.x, p0.y);
+    ctx.lineTo(p1.x, p1.y);
+    ctx.strokeStyle = hexToRgba(pal.glow, 0.9 * (1 - age));
+    ctx.lineWidth = 8 * (1 - age) + 1;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawVoxels() {
+  if (!voxels.length) return;
+  // wireframe cubes: a front square plus an offset back square and joins
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineWidth = 1;
+  for (const v of voxels) {
+    const a = Math.max(0, v.life / v.maxLife);
+    const s = v.size;
+    const d = s * 0.45; // depth offset for the back face
+    ctx.strokeStyle = `rgba(${v.color},${a})`;
+    ctx.fillStyle = `rgba(${v.color},${a * 0.25})`;
+    ctx.beginPath();
+    ctx.rect(v.x - s / 2, v.y - s / 2, s, s);
+    ctx.fill();
+    ctx.moveTo(v.x - s / 2 + d, v.y - s / 2 - d);
+    ctx.lineTo(v.x + s / 2 + d, v.y - s / 2 - d);
+    ctx.lineTo(v.x + s / 2 + d, v.y + s / 2 - d);
+    ctx.moveTo(v.x - s / 2, v.y - s / 2); ctx.lineTo(v.x - s / 2 + d, v.y - s / 2 - d);
+    ctx.moveTo(v.x + s / 2, v.y - s / 2); ctx.lineTo(v.x + s / 2 + d, v.y - s / 2 - d);
+    ctx.moveTo(v.x + s / 2, v.y + s / 2); ctx.lineTo(v.x + s / 2 + d, v.y + s / 2 - d);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawNova() {
