@@ -343,6 +343,15 @@ SKIP TUTORIAL leaves at any point; it runs once (`vortex-tutorial`, and
 pilots with a best score never see it) and SETTINGS has PLAY TUTORIAL.
 The panel lets taps through, so firing works under it.
 
+**Settings** — SETTINGS also has GLOW (AUTO/ON/OFF), VIBRATION and
+MUSIC / SFX sliders, saved in `vortex-settings` (`settings`). Glow is the
+canvas `shadowBlur`, the most expensive effect: the prototype setter is
+wrapped so one flag (`glowActive`) zeroes it everywhere, and on AUTO
+`watchFrameRate()` turns it off after 2 s under 40 fps and back on after
+8 s over 56. Music volume scales `MUSIC_VOLUME`; effects go through their
+own gain node (`sfxOut()`). `vibrate()` buzzes on hits, bombs and boss
+kills (Android; iPhones have no web vibration).
+
 **Pause** — P / Esc / the II button under the radar (`pauseGame()` /
 `resumeGame()`); the game also pauses itself on `visibilitychange` and
 window `blur` (phone lock, tab switch). While paused the loop skips every

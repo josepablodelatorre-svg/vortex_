@@ -29,6 +29,7 @@ port it is reused. Screenshots land in `tests/shots/` (not committed).
 | `campaign` | mission types, briefing, boss/level music, final boss, radar, Spanish comms |
 | `checkpoints` | checkpoint save and CONTINUE |
 | `tutorial` | first-run guided warm-up, once only, replay and skip |
+| `settings` | glow modes and AUTO, volume sliders, vibration, saved settings |
 | `pause` | P / Esc / button, auto-pause when hidden, MENU, no pause in versus |
 | `ship-classes` | class choice, hulls, bombs, warp spikes, gunner + interceptor perks |
 | `powerups` | shield, nova, ship movement, bullseye lock, pickup mix |

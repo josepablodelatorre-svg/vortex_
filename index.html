@@ -699,6 +699,28 @@
     flex-wrap: wrap;
   }
   #toggles button { margin-top: 14px; margin-left: 0; }
+  #sliders { display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 18px; }
+  #sliders label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: #c9a0ff;
+  }
+  #sliders label span { width: 56px; text-align: left; }
+  #sliders input[type=range] { width: 170px; accent-color: #a855ff; }
+  #glowToggle, #vibeToggle, #tutorialBtn {
+    margin-top: 14px;
+    background: transparent;
+    border: 1px solid #a855ff;
+    color: #c9a0ff;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 8px 12px;
+    cursor: pointer;
+  }
   #missionmult, #streaktag { font-size: 10px !important; color: #3f6; text-shadow: 0 0 8px #3f6; opacity: 1 !important; margin: 0 0 12px !important; }
   #streaktag { color: #ff8c28; text-shadow: 0 0 8px #ff8c28; margin: 14px 0 0 !important; }
   #missionlist { display: flex; flex-direction: column; gap: 8px; max-width: 460px; margin: 0 auto 10px; }
@@ -1215,7 +1237,13 @@
       <button id="crtToggle" class="selected">CRT: ON</button>
       <button id="langToggle">COMMS: EN</button>
       <button id="viewToggle">VIEW: CHASE</button>
+      <button id="glowToggle">GLOW: AUTO</button>
+      <button id="vibeToggle">VIBRATION: ON</button>
       <button id="tutorialBtn">PLAY TUTORIAL</button>
+    </div>
+    <div id="sliders">
+      <label><span>MUSIC</span><input type="range" id="musicVol" min="0" max="100" step="5" value="100"></label>
+      <label><span>SFX</span><input type="range" id="sfxVol" min="0" max="100" step="5" value="100"></label>
     </div>
     <button class="back" data-go="menu">&lt; BACK</button>
   </section>
@@ -1298,6 +1326,41 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
+// ---------- Player settings (volume, glow, vibration) ----------
+// glow: 'auto' turns canvas glow (shadowBlur, the costliest effect) off
+// while the frame rate is struggling and back on when it recovers.
+const settings = { music: 1, sfx: 1, glow: 'auto', vibrate: true };
+try { Object.assign(settings, JSON.parse(localStorage.getItem('vortex-settings') || '{}')); } catch (e) { /* ignore */ }
+function saveSettings() {
+  try { localStorage.setItem('vortex-settings', JSON.stringify(settings)); } catch (e) { /* ignore */ }
+}
+let glowActive = settings.glow !== 'off';
+// every 2D context's shadowBlur goes through this, so glow can be cut in one place
+const nativeBlur = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'shadowBlur');
+Object.defineProperty(CanvasRenderingContext2D.prototype, 'shadowBlur', {
+  configurable: true,
+  get() { return nativeBlur.get.call(this); },
+  set(v) { nativeBlur.set.call(this, glowActive ? v : 0); }
+});
+// frame-rate watch for GLOW: AUTO (an average of recent frame times)
+let fpsAvg = 60, lowFpsTime = 0, highFpsTime = 0;
+function watchFrameRate(rawDt) {
+  if (settings.glow !== 'auto' || rawDt <= 0 || rawDt > 0.25) return; // ignore hiccups and hidden tabs
+  fpsAvg += (1 / rawDt - fpsAvg) * 0.05;
+  if (glowActive) {
+    lowFpsTime = fpsAvg < 40 ? lowFpsTime + rawDt : 0;
+    if (lowFpsTime > 2) { glowActive = false; highFpsTime = 0; }
+  } else {
+    highFpsTime = fpsAvg > 56 ? highFpsTime + rawDt : 0;
+    if (highFpsTime > 8) { glowActive = true; lowFpsTime = 0; }
+  }
+}
+function vibrate(pattern) {
+  if (settings.vibrate && navigator.vibrate) {
+    try { navigator.vibrate(pattern); } catch (e) { /* ignore */ }
+  }
+}
+
 // ---------- Audio ----------
 let actx = null;
 // Every sound (SFX and music) goes through masterOut, which feeds both the
@@ -1314,6 +1377,17 @@ function audioOut() {
     }
   }
   return masterOut;
+}
+
+// sound effects go through their own gain (the SFX slider) into masterOut
+let sfxBus = null;
+function sfxOut() {
+  if (!sfxBus) {
+    sfxBus = actx.createGain();
+    sfxBus.gain.value = settings.sfx;
+    sfxBus.connect(audioOut());
+  }
+  return sfxBus;
 }
 
 function initAudio() {
@@ -1502,7 +1576,7 @@ function setMusicTrack(active) {
     const step = 0.035;
     let done = true;
     for (const [name, track] of Object.entries(MUSIC_TRACKS)) {
-      const target = name === active ? MUSIC_VOLUME : 0;
+      const target = name === active ? MUSIC_VOLUME * settings.music : 0;
       if (Math.abs(track.volume - target) > step) {
         track.volume += Math.sign(target - track.volume) * step;
         done = false;
@@ -1531,7 +1605,7 @@ function playBass(freq = 80, dur = 0.25) {
   gain.gain.setValueAtTime(0.4, actx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
   osc.connect(gain);
-  gain.connect(audioOut());
+  gain.connect(sfxOut());
   osc.start();
   osc.stop(actx.currentTime + dur);
 }
@@ -1546,7 +1620,7 @@ function playZap() {
   gain.gain.setValueAtTime(0.25, actx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.12);
   osc.connect(gain);
-  gain.connect(audioOut());
+  gain.connect(sfxOut());
   osc.start();
   osc.stop(actx.currentTime + 0.12);
 }
@@ -1561,7 +1635,7 @@ function playHit() {
   gain.gain.setValueAtTime(0.3, actx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.2);
   osc.connect(gain);
-  gain.connect(audioOut());
+  gain.connect(sfxOut());
   osc.start();
   osc.stop(actx.currentTime + 0.2);
 }
@@ -1576,7 +1650,7 @@ function playDamage() {
   gain.gain.setValueAtTime(0.35, actx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.35);
   osc.connect(gain);
-  gain.connect(audioOut());
+  gain.connect(sfxOut());
   osc.start();
   osc.stop(actx.currentTime + 0.35);
 }
@@ -1591,7 +1665,7 @@ function playPowerUp() {
   gain.gain.setValueAtTime(0.3, actx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.25);
   osc.connect(gain);
-  gain.connect(audioOut());
+  gain.connect(sfxOut());
   osc.start();
   osc.stop(actx.currentTime + 0.25);
 }
@@ -1607,7 +1681,7 @@ function playHack() {
   gain.gain.setValueAtTime(0.07, actx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.38);
   osc.connect(gain);
-  gain.connect(audioOut());
+  gain.connect(sfxOut());
   osc.start();
   osc.stop(actx.currentTime + 0.4);
 }
@@ -1624,7 +1698,7 @@ function playComms() {
     gain.gain.setValueAtTime(0.05, at);
     gain.gain.exponentialRampToValueAtTime(0.001, at + 0.06);
     osc.connect(gain);
-    gain.connect(audioOut());
+    gain.connect(sfxOut());
     osc.start(at);
     osc.stop(at + 0.07);
   });
@@ -1640,7 +1714,7 @@ function playEnemyShot() {
   gain.gain.setValueAtTime(0.2, actx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.18);
   osc.connect(gain);
-  gain.connect(audioOut());
+  gain.connect(sfxOut());
   osc.start();
   osc.stop(actx.currentTime + 0.18);
 }
@@ -1655,7 +1729,7 @@ function playBossHit() {
   gain.gain.setValueAtTime(0.35, actx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.3);
   osc.connect(gain);
-  gain.connect(audioOut());
+  gain.connect(sfxOut());
   osc.start();
   osc.stop(actx.currentTime + 0.3);
 }
@@ -2228,6 +2302,7 @@ function damageShip(amount) {
     }
   }
   hull -= amount;
+  vibrate(40);
   netBroadcast({ t: 'hit' });
   runDamage += amount;
   bossFightDamage += amount;
@@ -3373,6 +3448,44 @@ document.getElementById('crtToggle').addEventListener('click', (e) => {
   try { localStorage.setItem('vortex-crt', crtOn ? '1' : '0'); } catch (err) { /* ignore */ }
 });
 
+function applySettingsUI() {
+  document.getElementById('glowToggle').textContent = 'GLOW: ' + settings.glow.toUpperCase();
+  document.getElementById('vibeToggle').textContent = 'VIBRATION: ' + (settings.vibrate ? 'ON' : 'OFF');
+  document.getElementById('musicVol').value = Math.round(settings.music * 100);
+  document.getElementById('sfxVol').value = Math.round(settings.sfx * 100);
+}
+applySettingsUI();
+document.getElementById('glowToggle').addEventListener('click', (e) => {
+  e.stopPropagation();
+  settings.glow = { auto: 'on', on: 'off', off: 'auto' }[settings.glow] || 'auto';
+  glowActive = settings.glow !== 'off';
+  lowFpsTime = 0; highFpsTime = 0;
+  applySettingsUI();
+  saveSettings();
+});
+document.getElementById('vibeToggle').addEventListener('click', (e) => {
+  e.stopPropagation();
+  settings.vibrate = !settings.vibrate;
+  applySettingsUI();
+  saveSettings();
+  vibrate(40); // a taste of it when switched on
+});
+document.getElementById('musicVol').addEventListener('input', (e) => {
+  settings.music = e.target.value / 100;
+  if (activeMusic) MUSIC_TRACKS[activeMusic].volume = MUSIC_VOLUME * settings.music;
+  saveSettings();
+});
+document.getElementById('sfxVol').addEventListener('input', (e) => {
+  settings.sfx = e.target.value / 100;
+  if (sfxBus) sfxBus.gain.value = settings.sfx;
+  saveSettings();
+});
+document.getElementById('sfxVol').addEventListener('change', () => { initAudio(); playZap(); }); // hear the new level
+for (const el of document.querySelectorAll('#sliders input')) {
+  el.addEventListener('click', (e) => e.stopPropagation());
+  el.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+}
+
 // ---------- Ship accent color (purely cosmetic, picked on the title screen) ----------
 // Each palette: `main` is the hull line color, `glow` is the shadow/engine
 // accent color drawShip() and the swatch buttons both key off of.
@@ -4434,6 +4547,7 @@ function updateZapUI() {
 function superzap() {
   if (state !== 'playing' || zapperCharges <= 0 || warpTimer > 0) return;
   zapperCharges -= 1;
+  vibrate(90);
   triggerNova();
   tutorialEvent('bomb');
   // the boss can't be zapped away, but it's blasted back down the tunnel
@@ -4996,6 +5110,7 @@ function update(dt) {
             updateBossUI();
             addCoins(wasMini ? 10 : 25);
             if (!wasMini) missionEvent('boss');
+            vibrate(wasMini ? 60 : [80, 60, 160]);
             if (!wasMini) {
               setMusicTrack(gameplayTrack());
               if (bossFightDamage === 0) unlockAchievement('untouchable');
@@ -7555,8 +7670,10 @@ function drawShipPreview() {
 }
 
 function loop(now) {
-  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  const rawDt = (now - lastTime) / 1000;
+  const dt = Math.min(0.05, rawDt);
   lastTime = now;
+  if (state === 'playing' && !paused) watchFrameRate(rawDt);
   if (paused) {
     // the world holds still behind the overlay; nothing ticks
     if (state !== 'playing') resumeGame();
