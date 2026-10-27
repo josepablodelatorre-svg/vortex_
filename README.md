@@ -1,5 +1,8 @@
 # VORTEX — project handoff
 
+A game by **Nemo Inc**. Creative direction, art direction and gameplay:
+**José Pablo De la Torre**. Music by **VMBRA SVMVS**.
+
 A browser-based vector tunnel rail-shooter, built for the Claude for Games
 build-day at Platzi México (Oct 26, 2026). Tempest / Polybius / Tubeway /
 Space Invaders Infinity Gene inspired. Single-evening scope: no build step,

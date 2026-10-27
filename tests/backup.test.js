@@ -13,6 +13,8 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await ev(`showScreen('settings')`); await p.click('#settingslinks [data-go="credits"]');
   ok((await ev(`document.getElementById('creditlist').textContent`)).includes('NEMO INC') && (await ev(`document.getElementById('versiontag').textContent`)) === 'V' + await ev('GAME_VERSION'), 'credits show Nemo Inc and the version');
   ok(!(await ev(`document.getElementById('creditlist').textContent`)).includes('INC.'), 'no period after Nemo Inc');
+  const credits = await ev(`document.getElementById('creditlist').textContent`);
+  ok(credits.includes('JOSE PABLO DE LA TORRE') && credits.includes('VMBRA SVMVS') && credits.includes('CREATIVE DIRECTION, ART DIRECTION, GAMEPLAY'), 'credits name the director and the musician');
   await p.screenshot({ path: process.argv[2] + '/credits.png' });
   // export
   await ev(`showScreen('settings')`); await p.click('#settingslinks [data-go="backup"]');
