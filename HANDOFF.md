@@ -7,6 +7,10 @@ to keep building with separate credits, read `README.md` first (full
 architecture map), then this file for where things stand.
 
 ## State as of this export
+- THE RIFT endless mode is DONE and verified (see README "THE RIFT").
+- Music-reactive tunnel (follows the ambient soundtrack's swells, not
+  beats) and streaking spark particles are DONE; the music reaction only
+  runs when the game is served over http(s), not opened via file://.
 - Per-level boss system with miniboss detours is DONE and verified (each
   level: 7→miniboss, 13→miniboss, 20→real boss; boss defeat advances the
   level and resets the counter — see README "Levels & bosses").
@@ -33,8 +37,6 @@ No test suite — instead:
 
 ## Open ideas, not started (see README's last section)
 - Procedurally generated/seedable camera path.
-- An endless post-campaign mode beyond the current fixed 3-level
-  New-Game-Plus loop (inspired by linefire's "The Rift").
 - A larger Space-Invaders-style set-piece wave beyond the current small
   `grid` formation enemy.
 

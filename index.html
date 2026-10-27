@@ -320,6 +320,8 @@
     letter-spacing: 1px;
     opacity: 0.75;
     margin: 6px 0 0;
+    white-space: pre-line; /* the Rift record sits on its own line */
+    line-height: 1.8;
   }
   #shipcolor {
     margin-top: 18px;
@@ -347,6 +349,29 @@
   #shipcolor button.selected {
     box-shadow: 0 0 10px currentColor;
   }
+  /* THE RIFT entry buttons: crimson so they read as a different, darker
+     mode than the blue campaign options. The title one stays hidden until
+     the campaign has been beaten once. */
+  .riftBtn {
+    display: block;
+    margin: 18px auto 0;
+    background: transparent;
+    border: 1px solid #ff1e3c;
+    color: #ff5570;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    padding: 10px 14px;
+    cursor: pointer;
+    text-shadow: 0 0 8px #ff1e3c;
+    box-shadow: 0 0 10px rgba(255,30,60,0.35);
+  }
+  .riftBtn:hover {
+    background: #ff1e3c;
+    color: #000;
+    text-shadow: none;
+  }
+  #riftStart { display: none; }
 </style>
 </head>
 <body>
@@ -356,7 +381,7 @@
 <div id="levelbanner"></div>
 <div id="hud">
   <div id="hudtop">
-    <span>LVL <span id="levelnum">1</span></span>
+    <span><span id="levellabel">LVL</span> <span id="levelnum">1</span></span>
     <span>SCORE <span id="score">0</span></span>
   </div>
   <div id="hudkills">KILLS <span id="kills">0</span>/<span id="killTarget">20</span></div>
@@ -375,6 +400,7 @@
     <button data-diff="normal" class="selected">NORMAL</button>
     <button data-diff="hard">HARD</button>
   </div>
+  <button id="riftStart" class="riftBtn">ENTER THE RIFT</button>
   <button id="crtToggle" class="selected">CRT: ON</button>
   <div id="shipcolor">
     <span class="scLabel">SHIP</span>
@@ -395,6 +421,7 @@
   <h1>SIGNAL SECURED</h1>
   <p id="clearedscore"></p>
   <p>CLICK TO PUSH DEEPER</p>
+  <button id="riftFromCleared" class="riftBtn">OR ENTER THE RIFT</button>
 </div>
 
 <script>
@@ -746,7 +773,7 @@ function updateBossUI() {
 function spawnBoss(kind) {
   const hpMax = kind === 'mini'
     ? MINIBOSS_HP + runTier
-    : BOSS_HP_BASE + (currentLevel - 1) * BOSS_HP_PER_LEVEL + runTier * 2;
+    : BOSS_HP_BASE + (currentLevel - 1) * BOSS_HP_PER_LEVEL + runTier * 2 + Math.floor(riftTier() * 2);
   boss = { angle: 0, z: 1.0, hp: hpMax, hpMax, fireTimer: 2.0, alive: true, kind };
   bossActive = true;
   updateBossUI();
@@ -756,6 +783,81 @@ function spawnBoss(kind) {
 // it bumps this and the next run comes back meaner. Resets to 0 on a fresh
 // start or a loss, so dying doesn't carry the escalation forward.
 let runTier = 0;
+
+// ---------- THE RIFT (endless post-campaign mode) ----------
+// Unlocked by beating the campaign once. Instead of 3 fixed levels it's an
+// endless chain of sectors: each one rolls a new tunnel shape and a new
+// enemy mix, every RIFT_BOSS_EVERY-th sector ends in a boss, difficulty
+// keeps creeping up and so does the score multiplier. Played purely for
+// score/depth; it only ends when the hull does.
+let gameMode = 'campaign'; // 'campaign' | 'rift'
+let riftDepth = 1;
+let riftMix = null; // { drone, weaver, shooter, pentagram } spawn weights for this sector
+const RIFT_SECTOR_KILLS = 12;
+const RIFT_BOSS_EVERY = 3;
+let riftUnlocked = false;
+let bestRiftDepth = 0;
+let bestRiftScore = 0;
+try {
+  riftUnlocked = localStorage.getItem('vortex-rift-unlocked') === '1';
+  bestRiftDepth = parseInt(localStorage.getItem('vortex-best-rift-depth'), 10) || 0;
+  bestRiftScore = parseInt(localStorage.getItem('vortex-best-rift-score'), 10) || 0;
+} catch (e) { /* storage unavailable, keep defaults */ }
+
+// extra escalation the Rift layers on top of runTier, half a run tier per sector
+function riftTier() {
+  return gameMode === 'rift' ? (riftDepth - 1) * 0.5 : 0;
+}
+
+function riftMultiplier() {
+  return 1 + (riftDepth - 1) * 0.5;
+}
+
+function currentKillTarget() {
+  return gameMode === 'rift' ? RIFT_SECTOR_KILLS : KILL_TARGET;
+}
+
+// a fresh random enemy mix per sector: drones always, the nastier types
+// unlock with depth and get a random share each time, so no two sectors
+// play quite the same
+function rollRiftMix() {
+  const w = () => 0.3 + Math.random() * 1.2;
+  return {
+    drone: 1,
+    weaver: w(),
+    shooter: riftDepth >= 2 ? w() : 0,
+    pentagram: riftDepth >= 3 ? w() * 0.6 : 0
+  };
+}
+
+function pickRiftShape() {
+  // never repeat the current shape, so every sector visibly morphs
+  const options = SHAPE_STAGES.filter(sides => sides !== tunnelSidesTarget);
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+function enterRiftSector() {
+  killCount = 0;
+  nextMinibossIndex = MINIBOSS_THRESHOLDS.length; // no minibosses in the Rift
+  currentLevel = Math.min(LEVEL_COUNT, riftDepth); // enables clusters etc. like the later levels
+  riftMix = rollRiftMix();
+  tunnelSidesTarget = pickRiftShape();
+  document.getElementById('kills').textContent = killCount;
+  document.getElementById('levelnum').textContent = riftDepth;
+  updateRunUI();
+  showLevelBanner(riftDepth === 1 ? 'THE RIFT' : 'DEPTH ' + riftDepth);
+}
+
+function unlockRift() {
+  if (riftUnlocked) return;
+  riftUnlocked = true;
+  try { localStorage.setItem('vortex-rift-unlocked', '1'); } catch (e) { /* ignore */ }
+  applyRiftUnlock();
+}
+
+function applyRiftUnlock() {
+  document.getElementById('riftStart').style.display = riftUnlocked ? 'block' : 'none';
+}
 
 // Difficulty presets, chosen on the title screen before a run starts.
 let difficultySetting = 'normal';
@@ -770,9 +872,10 @@ const DIFFICULTY_PARAMS = {
 // the last, without a separate full preset table to maintain.
 function getDiffParams() {
   const base = DIFFICULTY_PARAMS[difficultySetting];
-  const spawnMul = Math.max(0.5, 1 - runTier * 0.08);
-  const speedMul = 1 + runTier * 0.12;
-  const rampMul = 1 + runTier * 0.15;
+  const tier = runTier + riftTier();
+  const spawnMul = Math.max(0.5, 1 - tier * 0.08);
+  const speedMul = 1 + tier * 0.12;
+  const rampMul = 1 + tier * 0.15;
   return {
     spawnBase: base.spawnBase * spawnMul,
     spawnMin: base.spawnMin * spawnMul,
@@ -1027,6 +1130,14 @@ canvas.addEventListener('touchstart', (e) => {
 document.getElementById('title').addEventListener('click', () => { initAudio(); startGame(false); });
 document.getElementById('gameover').addEventListener('click', () => { initAudio(); startGame(false); });
 document.getElementById('cleared').addEventListener('click', () => { initAudio(); startGame(true); });
+for (const id of ['riftStart', 'riftFromCleared']) {
+  document.getElementById(id).addEventListener('click', (e) => {
+    e.stopPropagation(); // don't also trigger the overlay's own start/continue
+    initAudio();
+    startGame(false, 'rift');
+  });
+}
+applyRiftUnlock();
 
 document.querySelectorAll('#difficulty button').forEach(btn => {
   btn.addEventListener('click', (e) => {
@@ -1118,10 +1229,23 @@ function updateBestTag() {
   el.textContent = bestScore > 0
     ? 'BEST ' + bestScore + '   FURTHEST: RUN ' + (bestRunTier + 1)
     : '';
+  if (bestRiftDepth > 0) el.textContent = (el.textContent + '\nRIFT: DEPTH ' + bestRiftDepth + '   BEST ' + bestRiftScore).trim();
 }
 updateBestTag();
 
 function recordRunResult() {
+  if (gameMode === 'rift') {
+    // the Rift keeps its own records: its multiplied scores would swamp
+    // the campaign's best score otherwise
+    if (riftDepth > bestRiftDepth) bestRiftDepth = riftDepth;
+    if (score > bestRiftScore) bestRiftScore = score;
+    try {
+      localStorage.setItem('vortex-best-rift-depth', String(bestRiftDepth));
+      localStorage.setItem('vortex-best-rift-score', String(bestRiftScore));
+    } catch (err) { /* ignore */ }
+    updateBestTag();
+    return;
+  }
   let changed = false;
   if (score > bestScore) { bestScore = score; changed = true; }
   if (runTier > bestRunTier) { bestRunTier = runTier; changed = true; }
@@ -1146,8 +1270,13 @@ function triggerShake(magnitude, duration) {
 // continuing = true means this run follows a win (New-Game-Plus escalation
 // stays/steps up); false means a fresh start or a retry after a loss, which
 // drops the escalation back to the base difficulty.
-function startGame(continuing) {
-  runTier = continuing ? runTier + 1 : 0;
+// mode: 'campaign' | 'rift'. When omitted, retrying from the game-over
+// screen replays whichever mode was just lost; anything else is campaign.
+function startGame(continuing, mode) {
+  if (mode === undefined) mode = state === 'gameover' ? gameMode : 'campaign';
+  gameMode = mode;
+  riftDepth = 1;
+  runTier = continuing && mode === 'campaign' ? runTier + 1 : 0;
   score = 0;
   killCount = 0;
   nextMinibossIndex = 0;
@@ -1160,8 +1289,9 @@ function startGame(continuing) {
   tunnelSides = tunnelSidesTarget;
   document.getElementById('score').textContent = score;
   document.getElementById('kills').textContent = killCount;
-  document.getElementById('killTarget').textContent = KILL_TARGET;
+  document.getElementById('killTarget').textContent = currentKillTarget();
   document.getElementById('levelnum').textContent = currentLevel;
+  document.getElementById('levellabel').textContent = gameMode === 'rift' ? 'DEPTH' : 'LVL';
   tripleLaserTimer = 0;
   updateHullUI();
   updateBossUI();
@@ -1186,12 +1316,16 @@ function startGame(continuing) {
   document.getElementById('gameover').style.display = 'none';
   document.getElementById('cleared').style.display = 'none';
   showLevelBanner(runTier > 0 ? 'RUN ' + (runTier + 1) : 'LEVEL 1');
+  if (gameMode === 'rift') enterRiftSector();
   setMusicTrack('destruction');
 }
 
 function updateRunUI() {
   const el = document.getElementById('hudrun');
-  if (runTier > 0) {
+  if (gameMode === 'rift') {
+    el.textContent = 'THE RIFT  x' + riftMultiplier();
+    el.style.display = 'block';
+  } else if (runTier > 0) {
     el.textContent = 'RUN ' + (runTier + 1);
     el.style.display = 'block';
   } else {
@@ -1202,7 +1336,9 @@ function updateRunUI() {
 function endGame() {
   state = 'gameover';
   recordRunResult();
-  document.getElementById('finalscore').textContent = 'SCORE: ' + score + '   ENEMIES: ' + killCount + '/' + KILL_TARGET;
+  document.getElementById('finalscore').textContent = gameMode === 'rift'
+    ? 'SCORE: ' + score + '   DEPTH: ' + riftDepth
+    : 'SCORE: ' + score + '   ENEMIES: ' + killCount + '/' + KILL_TARGET;
   document.getElementById('gameover').style.display = 'block';
   setMusicTrack('garden');
 }
@@ -1210,6 +1346,7 @@ function endGame() {
 function winGame() {
   state = 'cleared';
   recordRunResult();
+  unlockRift();
   document.getElementById('clearedscore').textContent = 'SCORE: ' + score + '   NEXT: RUN ' + (runTier + 2) + ' (HARDER)';
   document.getElementById('cleared').style.display = 'block';
   setMusicTrack('garden');
@@ -1219,6 +1356,14 @@ function winGame() {
 let lastTime = performance.now();
 
 function pickEnemyType() {
+  if (gameMode === 'rift' && riftMix) {
+    let roll = Math.random() * (riftMix.drone + riftMix.weaver + riftMix.shooter + riftMix.pentagram);
+    for (const type of ['drone', 'weaver', 'shooter', 'pentagram']) {
+      roll -= riftMix[type];
+      if (roll < 0) return type;
+    }
+    return 'drone';
+  }
   const roll = Math.random();
   if (currentLevel === 1) return 'drone';
   if (currentLevel === 2) return roll < 0.65 ? 'drone' : 'weaver';
@@ -1488,7 +1633,7 @@ function update(dt) {
             }
           }
           e.alive = false;
-          score += e.type === 'pentagram' ? 30 : 10;
+          score += Math.round((e.type === 'pentagram' ? 30 : 10) * (gameMode === 'rift' ? riftMultiplier() : 1));
           killCount += 1;
           document.getElementById('score').textContent = score;
           document.getElementById('kills').textContent = killCount;
@@ -1551,6 +1696,10 @@ function update(dt) {
               // a miniboss is a side fight: beating it doesn't advance the
               // level or reset progress, play just resumes.
               showLevelBanner('CLEAR');
+            } else if (gameMode === 'rift') {
+              // Rift bosses are gates between sectors, never an ending
+              riftDepth += 1;
+              enterRiftSector();
             } else if (currentLevel < LEVEL_COUNT) {
               // beating a level's real boss is what actually advances the
               // level; each level's kill count (and miniboss schedule)
@@ -1579,7 +1728,16 @@ function update(dt) {
         nextMinibossIndex += 1;
         showLevelBanner('INCOMING');
         spawnBoss('mini');
-      } else if (killCount >= KILL_TARGET) {
+      } else if (gameMode === 'rift' && killCount >= RIFT_SECTOR_KILLS) {
+        if (riftDepth % RIFT_BOSS_EVERY === 0) {
+          enemies = [];
+          showLevelBanner('WARNING');
+          spawnBoss('level');
+        } else {
+          riftDepth += 1;
+          enterRiftSector();
+        }
+      } else if (gameMode === 'campaign' && killCount >= KILL_TARGET) {
         enemies = [];
         showLevelBanner(currentLevel < LEVEL_COUNT ? 'WARNING' : 'FINAL WARNING');
         spawnBoss(currentLevel < LEVEL_COUNT ? 'level' : 'final');

@@ -85,6 +85,23 @@ left/right/up/down turns, not just a static tube.
   trigger a restart — both must pass `continuing` correctly or clicking
   off-center on the win screen silently drops the escalation.
 
+**THE RIFT (endless mode)** — unlocked the first time the campaign is
+beaten (`unlockRift()` from `winGame()`, saved as `vortex-rift-unlocked`).
+Entered from `#riftStart` on the title screen or `#riftFromCleared` on the
+win screen, both calling `startGame(false, 'rift')`. `gameMode` is
+`'campaign' | 'rift'`; `startGame(continuing, mode)` with `mode` omitted
+replays the mode just lost when retrying from game over, and is campaign
+otherwise, so all the existing `startGame(...)` call sites keep working.
+Endless sectors of `RIFT_SECTOR_KILLS = 12` kills each; every
+`RIFT_BOSS_EVERY = 3`rd sector ends in a boss whose defeat goes to the next
+sector instead of `winGame()`. `enterRiftSector()` rolls a new enemy mix
+(`rollRiftMix()`, weights used by `pickEnemyType()`) and a new tunnel shape
+(`pickRiftShape()`, never the current one). Escalation is `riftTier()` (half
+a run tier per sector) added to `runTier` in `getDiffParams()` and boss hp;
+`riftMultiplier()` (×1, ×1.5, ×2...) scales kill points. HUD label switches
+LVL→DEPTH. Rift records (`vortex-best-rift-depth`, `vortex-best-rift-score`)
+are kept separate from the campaign best score.
+
 **Enemies** (`enemies` array, each `{angle, z, shape, type, speed, alive,
 baseAngle, phase, fireTimer?, formSeed?, hp?}`)
 - `drone` — basic, straight in, level 1+.
@@ -196,9 +213,6 @@ From comparing notes against Vecter (Steam), linefire/VectorSwarm, and a
 couple of GitHub resource lists:
 - Procedurally generated / seedable camera path (currently a fixed
   8-segment straight/curve loop defined in `PATH_SEGMENTS_DEF`).
-- An endless post-campaign mode beyond New-Game-Plus (à la linefire's
-  "The Rift" — a procedurally escalating chain played purely for score),
-  as opposed to NGP's fixed 3-level loop repeating harder each time.
 - A classic Space-Invaders-style full grid wave was floated as a
   throwback idea beyond the current `grid` formation enemy — the
   formation enemy shipped, a larger set-piece wave did not.
