@@ -15,7 +15,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   console.log('  hit line:', await txt());
   ok(await ev(`hitLabels.some(h => h.text === '-16 HULL')`) || true, 'damage callout pushed');
   await ev(`collectPowerup({angle: 0, z: 0.02, alive: true, kind: 'shield'})`);
-  ok(await ev(`hitLabels.some(h => h.text === 'SHIELD UP!' && h.size === 15)`), 'big SHIELD UP! callout at the ship');
+  ok(await ev(`hitLabels.some(h => h.text === 'OVERCHARGE!' && h.size === 15)`), 'big OVERCHARGE! callout at the ship');
   await ev('comms = null; hull = 20');
   await p.waitForFunction(() => /HULL|REPAIR|ODDS/.test(document.getElementById('commstext').textContent), null, { timeout: 5000 }).catch(() => {});
   console.log('  low hull line:', await txt());
@@ -28,7 +28,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await p.waitForFunction(() => /INTERCEPTOR|BIG|SHOOT IT/.test(document.getElementById('commstext').textContent), null, { timeout: 5000 }).catch(() => {});
   console.log('  miniboss line:', await txt());
   ok(/INTERCEPTOR|BIG|SHOOT IT/.test(await txt()), 'miniboss warning');
-  for (let i = 0; i < 20 && await ev("state === 'playing'"); i++) { await ev('shieldTimer = 0; damageShip(99999)'); await p.waitForTimeout(100); } await p.waitForTimeout(600);
+  for (let i = 0; i < 20 && await ev("state === 'playing'"); i++) { await ev('plasma = 0; damageShip(99999)'); await p.waitForTimeout(100); } await p.waitForTimeout(600);
   ok(await ev(`document.getElementById('comms').style.opacity`) === '0', 'comms hidden on game over');
   console.log('errors', JSON.stringify(errs));
   await b.close();

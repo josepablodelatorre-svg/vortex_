@@ -130,6 +130,9 @@
     box-shadow: 0 0 6px #22ddff;
   }
   #powerfill { width: 0%; background: #ffe14d; box-shadow: 0 0 6px #ffe14d; }
+  #plasmafill.over { background: #e8fdff; box-shadow: 0 0 10px #50e6ff; }
+  /* cockpit view draws hull, plasma and power on the dashboard */
+  body.cockpitview #hullrow, body.cockpitview #plasmarow, body.cockpitview #powerrow { display: none; }
   #powerfill.full { animation: cursorBlink 0.5s infinite; }
   #hullfill {
     height: 100%;
@@ -1690,7 +1693,7 @@ function triggerTrackItem(it) {
     say('brake', { en: ['EASY. KEEP YOUR VELOCITY DOWN.', 'BREATHE, PILOT. LINE UP YOUR SHOTS.'], es: ['CALMA. BAJA LA VELOCIDAD.', 'RESPIRA, PILOTO. APUNTA BIEN.'] }, 1, 10);
   } else if (it.kind === 'hoop') {
     tripTimer = 2.8;
-    const gifts = ['star', 'echo', 'shield', 'overdrive', 'disc'];
+    const gifts = ['star', 'echo', 'shield', 'disc'];
     collectPowerup({ angle: it.angle, z: 0.02, alive: true, kind: gifts[Math.floor(Math.random() * gifts.length)] });
     say('hoop', { en: ['WHAT WAS THAT?! YOU ARE GLOWING, PILOT!', 'WHOA. EVERYTHING IS... COLOURS.'], es: ['¡¿QUE FUE ESO?! ¡ESTAS BRILLANDO, PILOTO!', 'UF. TODO ES... COLORES.'] }, 2, 10);
   } else if (it.kind === 'portal') {
@@ -2151,7 +2154,7 @@ function updateLockIn(dt) {
   lockinAnnounced = false;
   updatePlasmaUI();
   lockinFireTimer -= dt;
-  if (lockinFireTimer <= 0 && overdriveTimer <= 0) {
+  if (lockinFireTimer <= 0) {
     fire();
     lockinFireTimer = LOCKIN_FIRE_INTERVAL;
   }
@@ -2170,13 +2173,6 @@ function updateHullUI() {
 // Shared damage path for anything that hurts the ship: enemy contact,
 // enemy bolts, boss contact. Keeps the flash/sound/lose-check in one place.
 function damageShip(amount) {
-  if (shieldTimer > 0) {
-    // the shield eats the hit completely: a flash and a ping, no hull loss
-    triggerShake(4, 0.12);
-    playBossHit();
-    shipCallout('BLOCKED', '#50e6ff');
-    return;
-  }
   plasmaHitAt = t;
   if (plasma > 0) {
     const soak = Math.min(plasma, amount);
@@ -2587,9 +2583,6 @@ let enemyBolts = []; // { angle, z }
 let powerups = []; // { angle, z, alive, kind: 'hull' | 'star' }
 let powerupTimer = 0;
 let tripleLaserTimer = 0; // seconds remaining on an active triple-laser pickup
-let shieldTimer = 0;      // seconds of full damage immunity left (shield pickup)
-let overdriveTimer = 0;   // seconds of automatic rapid fire left (overdrive pickup)
-let autoFireTimer = 0;    // countdown to overdrive's next automatic shot
 let novaFlash = 0;        // 1..0, the screen-clearing nova shockwave animation
 
 // Echo pickup (Gradius-style options): for ECHO_DURATION, every shot is
@@ -3405,7 +3398,9 @@ function inShipLane(angle, width) {
 }
 
 function updatePlasmaUI() {
-  document.getElementById('plasmafill').style.width = (plasmaMax ? plasma / plasmaMax * 100 : 0) + '%';
+  const fill = document.getElementById('plasmafill');
+  fill.style.width = (plasmaMax ? Math.min(1, plasma / plasmaMax) * 100 : 0) + '%';
+  fill.classList.toggle('over', plasma > plasmaMax);
   const pf = document.getElementById('powerfill');
   pf.style.width = power + '%';
   pf.classList.toggle('full', power >= 100);
@@ -3795,9 +3790,6 @@ function startGame(continuing, mode) {
   document.getElementById('levelnum').textContent = currentLevel;
   document.getElementById('levellabel').textContent = gameMode === 'rift' ? 'DEPTH' : 'LVL';
   tripleLaserTimer = 0;
-  shieldTimer = 0;
-  overdriveTimer = 0;
-  autoFireTimer = 0;
   novaFlash = 0;
   shipX = 0;
   shipVX = 0;
@@ -4001,9 +3993,7 @@ function spawnFormation() {
 
 // How long a star pickup's triple-laser spread lasts.
 const TRIPLE_LASER_DURATION = 9;
-const SHIELD_DURATION = 8;
-const OVERDRIVE_DURATION = 7;
-const OVERDRIVE_FIRE_INTERVAL = 0.11; // ~9 shots a second, aimed wherever the pointer is
+const BOMB_MAX = 5; // bomb pickups stack up to this many
 
 // ---------- Commander transmissions ----------
 // say(key, lines, priority, cooldown): one radio line, typed out in the
@@ -4061,12 +4051,11 @@ const COMMS_ES = {
   "PATCHED UP. KEEP GOING!": "PARCHADO. ¡SIGUE!",
   "TRIPLE LASER! SPREAD 'EM OUT!": "¡LÁSER TRIPLE! ¡REPÁRTELES!",
   "FIREPOWER TRIPLED!": "¡POTENCIA DE FUEGO TRIPLICADA!",
-  "SHIELDS UP. GO LOUD!": "ESCUDOS ARRIBA. ¡CON TODO!",
+  "PLASMA OVERCHARGED. GO LOUD!": "PLASMA SOBRECARGADO. ¡CON TODO!",
   "YOU'RE COVERED. PUSH IN!": "ESTÁS CUBIERTO. ¡AVANZA!",
-  "OVERDRIVE! LET 'EM HAVE IT!": "¡OVERDRIVE! ¡DALES CON TODO!",
   "GUNS HOT! FULL AUTO!": "¡CAÑONES CALIENTES! ¡AUTOMÁTICO!",
-  "BOOM. SCREEN CLEAR.": "BUM. PANTALLA LIMPIA.",
-  "NOVA! THAT CLEARED THE AIR.": "¡NOVA! ESO DESPEJÓ EL AIRE.",
+  "ONE MORE BOMB IN THE RACK.": "UNA BOMBA MAS EN EL ARSENAL.",
+  "EXTRA BOMB! SAVE IT FOR A BAD MOMENT.": "¡BOMBA EXTRA! GUARDALA PARA UN MAL MOMENTO.",
   "ECHO ONLINE! YOUR SHOTS HAVE GHOSTS!": "¡ECO EN LÍNEA! ¡TUS DISPAROS TIENEN FANTASMAS!",
   "ECHO! EVERY SHOT TWICE MORE!": "¡ECO! ¡CADA DISPARO, DOS VECES MÁS!",
   "DISC ARMED! THROW IT, IT COMES BACK!": "¡DISCO ARMADO! ¡LÁNZALO, REGRESA!",
@@ -4441,8 +4430,9 @@ function finishWarp() {
   onLevelStart();
 }
 
-// Nova: every enemy and enemy bolt on screen is wiped out at once. Kills
-// count and score as normal; the boss only gets its incoming fire cleared.
+// The bomb's blast (nova): every enemy and enemy bolt on screen is wiped
+// out at once. Kills count and score as normal; the boss only gets its
+// incoming fire cleared.
 function triggerNova() {
   novaFlash = 1;
   triggerShake(18, 0.4);
@@ -4466,15 +4456,14 @@ function triggerNova() {
 function spawnPowerup() {
   const angle = rng('powerup') * Math.PI * 2;
   // hull repair is still the most common; the star is a Mario-style power
-  // moment; shield, overdrive and the screen-clearing nova are the rarer extras
+  // moment; plasma overcharge, echo, disc and a spare bomb are the extras
   const roll = rng('powerup');
   const kind = roll < 0.4 ? 'hull'
-    : roll < 0.55 ? 'star'
-    : roll < 0.68 ? 'shield'
-    : roll < 0.79 ? 'overdrive'
-    : roll < 0.87 ? 'echo'
-    : roll < 0.95 ? 'disc'
-    : 'nova';
+    : roll < 0.56 ? 'star'
+    : roll < 0.71 ? 'shield'
+    : roll < 0.82 ? 'echo'
+    : roll < 0.92 ? 'disc'
+    : 'bomb';
   powerups.push({ angle, z: 1.0, alive: true, kind });
 }
 
@@ -4484,9 +4473,8 @@ function collectPowerup(p) {
   const pickupCallouts = {
     hull: ['+' + HULL_REPAIR_PER_POWERUP + ' HULL', '#ffd23f', ['REPAIRS ONLINE.', 'PATCHED UP. KEEP GOING!']],
     star: ['TRIPLE LASER!', '#fff6c8', ["TRIPLE LASER! SPREAD 'EM OUT!", 'FIREPOWER TRIPLED!']],
-    shield: ['SHIELD UP!', '#50e6ff', ['SHIELDS UP. GO LOUD!', "YOU'RE COVERED. PUSH IN!"]],
-    overdrive: ['OVERDRIVE!', '#ff8c28', ["OVERDRIVE! LET 'EM HAVE IT!", 'GUNS HOT! FULL AUTO!']],
-    nova: ['NOVA!', '#ff78ff', ['BOOM. SCREEN CLEAR.', 'NOVA! THAT CLEARED THE AIR.']],
+    shield: ['OVERCHARGE!', '#50e6ff', ['PLASMA OVERCHARGED. GO LOUD!', "YOU'RE COVERED. PUSH IN!"]],
+    bomb: ['+1 BOMB', '#ff78ff', ['ONE MORE BOMB IN THE RACK.', 'EXTRA BOMB! SAVE IT FOR A BAD MOMENT.']],
     echo: ['ECHO!', '#b4ff5a', ['ECHO ONLINE! YOUR SHOTS HAVE GHOSTS!', 'ECHO! EVERY SHOT TWICE MORE!']],
     disc: ['LAMBDA DISC!', '#e8fdff', ['DISC ARMED! THROW IT, IT COMES BACK!', 'LAMBDA DISC! SLICE THE WHOLE RING!']]
   };
@@ -4504,16 +4492,15 @@ function collectPowerup(p) {
     updateTripleUI();
     burst(p.angle, p.z, { color: '180,255,90', bitColor: '#b4ff5a', label: 'ECHO!', labelColor: '#e2ffb8' });
   } else if (p.kind === 'shield') {
-    shieldTimer = SHIELD_DURATION * chargeMul();
-    updateTripleUI();
-    burst(p.angle, p.z, { color: '80,230,255', bitColor: '#50e6ff', label: 'SHIELD!', labelColor: '#b8f6ff' });
-  } else if (p.kind === 'overdrive') {
-    overdriveTimer = OVERDRIVE_DURATION * chargeMul();
-    autoFireTimer = 0;
-    updateTripleUI();
-    burst(p.angle, p.z, { color: '255,140,40', bitColor: '#ff8c28', label: 'OVERDRIVE!', labelColor: '#ffc080' });
-  } else if (p.kind === 'nova') {
-    triggerNova();
+    // overcharge: the plasma layer refills and stacks one more full layer
+    // on top (more with the LONG CHARGE upgrade); it lasts until it's hit
+    plasma = Math.max(plasma, plasmaMax * (1 + chargeMul()));
+    updatePlasmaUI();
+    burst(p.angle, p.z, { color: '80,230,255', bitColor: '#50e6ff', label: 'OVERCHARGE!', labelColor: '#b8f6ff' });
+  } else if (p.kind === 'bomb') {
+    zapperCharges = Math.min(BOMB_MAX, zapperCharges + 1);
+    updateZapUI();
+    burst(p.angle, p.z, { color: '255,120,255', bitColor: '#ff78ff', label: '+1 BOMB', labelColor: '#ffb3ff' });
   } else if (p.kind === 'star') {
     tripleLaserTimer = TRIPLE_LASER_DURATION * shipClass().tripleMul * chargeMul();
     updateTripleUI();
@@ -4540,8 +4527,6 @@ function updateTripleUI() {
   const el = document.getElementById('hudtriple');
   const lines = [];
   if (tripleLaserTimer > 0) lines.push('TRIPLE LASER ' + tripleLaserTimer.toFixed(1) + 's');
-  if (shieldTimer > 0) lines.push('SHIELD ' + shieldTimer.toFixed(1) + 's');
-  if (overdriveTimer > 0) lines.push('OVERDRIVE ' + overdriveTimer.toFixed(1) + 's');
   if (echoTimer > 0) lines.push('ECHO ' + echoTimer.toFixed(1) + 's');
   if (discCharges > 0) lines.push('DISC x' + discCharges);
   if (boostTimer > 0) lines.push('BOOST ' + boostTimer.toFixed(1) + 's');
@@ -4754,18 +4739,9 @@ function update(dt) {
     }
 
     // pickup timers count down to nothing
-    if (tripleLaserTimer > 0 || shieldTimer > 0 || overdriveTimer > 0 || boostTimer > 0 || brakeTimer > 0) {
+    if (tripleLaserTimer > 0 || boostTimer > 0 || brakeTimer > 0) {
       tripleLaserTimer = Math.max(0, tripleLaserTimer - dt);
-      shieldTimer = Math.max(0, shieldTimer - dt);
-      overdriveTimer = Math.max(0, overdriveTimer - dt);
       updateTripleUI();
-    }
-    if (overdriveTimer > 0) {
-      autoFireTimer -= dt;
-      if (autoFireTimer <= 0) {
-        fire();
-        autoFireTimer = OVERDRIVE_FIRE_INTERVAL;
-      }
     }
     novaFlash = Math.max(0, novaFlash - dt * 1.6);
     updateLockIn(dt);
@@ -4828,7 +4804,7 @@ function update(dt) {
 
     // interceptor: holding the button keeps firing
     const cls = shipClass();
-    if (cls.holdFire > 0 && pointerHeld && overdriveTimer <= 0) {
+    if (cls.holdFire > 0 && pointerHeld) {
       holdFireTimer -= dt;
       if (holdFireTimer <= 0) {
         fire();
@@ -5762,22 +5738,8 @@ function drawPowerups() {
       ctx.beginPath();
       ctx.arc(0, 0, size * 0.45, 0, Math.PI * 2);
       ctx.stroke();
-    } else if (p.kind === 'overdrive') {
-      // orange double chevron, pointing outward and jittering: rapid fire
-      ctx.rotate(Math.sin(t * 9) * 0.15);
-      ctx.strokeStyle = '#ff8c28';
-      ctx.shadowColor = '#ff8c28';
-      ctx.shadowBlur = 18;
-      ctx.lineWidth = 2.2;
-      for (const off of [-0.35, 0.25]) {
-        ctx.beginPath();
-        ctx.moveTo(-size * 0.8, (off + 0.4) * size);
-        ctx.lineTo(0, (off - 0.4) * size);
-        ctx.lineTo(size * 0.8, (off + 0.4) * size);
-        ctx.stroke();
-      }
-    } else if (p.kind === 'nova') {
-      // magenta burst: eight spikes around a core, throbbing
+    } else if (p.kind === 'bomb') {
+      // magenta burst (the bomb's blast): eight spikes around a core, throbbing
       ctx.rotate(-t * 3);
       const throb = 1 + Math.sin(t * 12) * 0.15;
       ctx.strokeStyle = '#ff78ff';
@@ -5933,8 +5895,8 @@ function drawShip(opts) {
     g.stroke();
   };
 
-  // thruster flames: flicker constantly, flare on recoil and under overdrive
-  const hot = live && overdriveTimer > 0;
+  // thruster flames: flicker constantly, flare on recoil and on a boost pad
+  const hot = live && boostTimer > 0;
   const flare = 1 + (live ? shipRecoil * 0.8 : 0) + (hot ? 0.6 : 0);
   g.save();
   g.globalCompositeOperation = 'lighter';
@@ -6026,8 +5988,9 @@ function drawShip(opts) {
     g.stroke();
   }
 
-  // shield bubble: a pulsing hex cage, flickering in its last second or two
-  if (live && shieldTimer > 0 && (shieldTimer > 1.5 || Math.sin(t * 30) > 0)) {
+  // overcharged plasma: a pulsing hex cage, flickering when nearly spent
+  const over = plasmaMax ? (plasma - plasmaMax) / plasmaMax : 0;
+  if (live && over > 0 && (over > 0.2 || Math.sin(t * 30) > 0)) {
     g.save();
     g.globalCompositeOperation = 'lighter';
     g.rotate(t * 0.8);
@@ -7318,6 +7281,7 @@ const pauseBtnEl = document.getElementById('pauseBtn');
 function syncRunClass() {
   document.body.classList.toggle('inrun', state === 'playing' || state === 'gameover' || state === 'cleared');
   document.body.classList.toggle('playing', canPause());
+  document.body.classList.toggle('cockpitview', viewMode === 'cockpit' && state === 'playing');
   // the pause button sits just under the radar, whose size follows the screen
   const top = Math.round(2 * Math.max(38, Math.min(62, Math.min(W, H) * 0.09)) + 30) + 'px';
   if (pauseBtnEl.style.top !== top) pauseBtnEl.style.top = top;

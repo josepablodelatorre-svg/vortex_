@@ -8,19 +8,25 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await p.goto('http://127.0.0.1:8765/index.html'); await p.waitForTimeout(300);
   await ((await p.evaluate("state === 'title'")) ? p.evaluate('startGame(false)') : p.mouse.click(500, 600)); await p.waitForTimeout(100);
   ok(await ev('HULL_MAX === 150 && hull === 150'), 'hull 150');
-  // shield blocks damage
+  // shield pickup overcharges plasma: a second full layer, then hull
+  await ev('plasma = plasmaMax');
+  const pm = await ev('plasmaMax');
   await ev(`collectPowerup({angle: 0, z: 0.02, alive: true, kind: 'shield'})`);
-  await ev('damageShip(50)');
-  ok(await ev('hull === 150 && shieldTimer > 7'), 'shield absorbs a hit');
-  ok((await ev(`document.getElementById('hudtriple').textContent`)).includes('SHIELD'), 'HUD shows shield timer');
-  await ev('shieldTimer = 0.01'); await p.waitForTimeout(100);
-  const before = await ev('hull + plasma');
-  await ev('damageShip(16)');
-  ok(await ev('hull + plasma') < before, 'damage resumes after shield expires');
-  // nova clears screen and counts kills
+  ok(await ev('plasma') === pm * 2 && await ev(`document.getElementById('plasmafill').classList.contains('over')`), 'shield pickup overcharges plasma to 2x (' + await ev('plasma') + ')');
+  await ev(`damageShip(${pm} + 10)`);
+  ok(await ev('hull === 150') && await ev('plasma') === pm - 10, 'overcharge soaks hits before the hull');
+  await ev('plasma = 0; damageShip(16)');
+  ok(await ev('hull === 134'), 'with plasma gone, hits reach the hull');
+  // bomb pickup: one more bomb, capped
+  await ev('zapperCharges = 1');
+  await ev(`collectPowerup({angle: 0, z: 0.02, alive: true, kind: 'bomb'})`);
+  ok(await ev('zapperCharges') === 2 && (await ev(`document.getElementById('hudzap').textContent`)).startsWith('BOMB x2'), 'bomb pickup adds a bomb');
+  for (let i = 0; i < 8; i++) await ev(`collectPowerup({angle: 0, z: 0.02, alive: true, kind: 'bomb'})`);
+  ok(await ev('zapperCharges === BOMB_MAX'), 'bombs cap at BOMB_MAX');
+  // a bomb still clears the screen and scores the kills
   await ev(`enemies = []; for (let i=0;i<5;i++) spawnEnemy(i, 'drone'); enemyBolts.push({angle:0,z:0.5}); killCount = 0; score = 0;`);
-  await ev(`collectPowerup({angle: 0, z: 0.02, alive: true, kind: 'nova'})`);
-  ok(await ev('enemies.length === 0 && enemyBolts.length === 0 && killCount === 5 && score === 50'), 'nova clears enemies + bolts and scores them');
+  await ev('superzap()');
+  ok(await ev('enemies.length === 0 && enemyBolts.length === 0 && killCount === 5 && score === 50'), 'bomb clears enemies + bolts and scores them');
   // ship rides its arc toward the aim
   await p.mouse.move(950, 600); await p.waitForFunction('shipScreenPos(shipLane).x > 600', null, { timeout: 4000 }).catch(() => {});
   const x1 = await ev('shipScreenPos(shipLane).x');
@@ -34,10 +40,10 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(await ev('findAimTarget() === null'), 'no lock when nothing in line');
   // spawn distribution
   const kinds = await ev(`(() => { powerups = []; const c = {}; for (let i=0;i<4000;i++) spawnPowerup(); for (const q of powerups) c[q.kind]=(c[q.kind]||0)+1; powerups = []; return c; })()`);
-  const KINDS = ['hull', 'shield', 'star', 'nova', 'echo', 'disc', 'overdrive'];
+  const KINDS = ['hull', 'shield', 'star', 'bomb', 'echo', 'disc'];
   ok(KINDS.every(k => kinds[k] > 0) && Object.keys(kinds).length === KINDS.length, 'every pickup kind spawns: ' + JSON.stringify(kinds));
-  // screenshot with shield + overdrive + lock
-  await ev(`enemies = []; aimAngle = 0.3; spawnEnemy(0.3, 'drone'); enemies[0].z = 0.4; enemies[0].speed = 0; collectPowerup({angle: 0, z: 0.02, alive: true, kind: 'shield'}); for (const k of ['shield','overdrive','nova','star','hull']) powerups.push({angle: Math.random()*6, z: 0.3 + Math.random()*0.5, alive: true, kind: k});`);
+  // screenshot with overcharge + lock + every pickup
+  await ev(`enemies = []; aimAngle = 0.3; spawnEnemy(0.3, 'drone'); enemies[0].z = 0.4; enemies[0].speed = 0; collectPowerup({angle: 0, z: 0.02, alive: true, kind: 'shield'}); for (const k of ['shield','bomb','echo','disc','star','hull']) powerups.push({angle: Math.random()*6, z: 0.3 + Math.random()*0.5, alive: true, kind: k});`);
   await p.mouse.move(620, 200); await p.waitForTimeout(400);
   await p.screenshot({ path: process.argv[2] + '/powerups.png' });
   console.log('errors', JSON.stringify(errs));

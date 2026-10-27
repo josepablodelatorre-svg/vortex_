@@ -15,7 +15,7 @@ the architecture of each piece.
 - 5-level campaign, one environment per level, changing after each boss
   (tunnel, asteroids, open space, trench, planet surface); THE RIFT; daily tunnel.
 - Dodging on a lower-half arc, plasma shield, power + lock-in, bombs.
-- Power-ups (hull, triple, shield, overdrive, echo, lambda disc, nova),
+- Power-ups (hull, triple, plasma overcharge, echo, lambda disc, +1 bomb),
   floor pads, hoops, portals, warp with black-and-white ink.
 - Warship bosses, Watchdog, OVERSEER rival AI, missions, coins +
   upgrades, daily streak, checkpoints, achievements, ranks, save clip.

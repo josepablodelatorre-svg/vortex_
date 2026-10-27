@@ -117,19 +117,24 @@ baseAngle, phase, fireTimer?, formSeed?, hp?}`)
   The "something hellish came through the event horizon with everything
   else" enemy (Star Wars meets Event Horizon direction).
 
-**Extra power-ups** — besides `hull` and `star`, `spawnPowerup()` rolls
-`shield` (cyan hexagon: `shieldTimer = 8`s, `damageShip()` returns early
-and shows BLOCKED), `overdrive` (orange chevrons: `overdriveTimer = 7`s of
-automatic fire every `OVERDRIVE_FIRE_INTERVAL`) and `nova` (magenta burst:
-`triggerNova()` kills every enemy and enemy bolt on screen, scoring them;
-the boss only loses its incoming fire). Mix: hull 45%, star 18%, shield
-15%, overdrive 13%, nova 9%. `#hudtriple` lists every active timer.
+**Extra power-ups** — kept to six, each doing one clear thing. Besides
+`hull` and `star`, `spawnPowerup()` rolls `shield` (cyan hexagon:
+OVERCHARGE, refills the plasma layer and stacks one more full layer on
+top — `plasmaMax × (1 + chargeMul())` — which lasts until it is shot
+away; the bar turns white while overcharged), `echo`, `disc` and `bomb`
+(magenta burst: +1 bomb, up to `BOMB_MAX`; the bomb's blast is
+`triggerNova()`, which kills every enemy and enemy bolt on screen, scoring
+them; the boss only loses its incoming fire). Mix: hull 40%, star 16%,
+shield 15%, echo 11%, disc 10%, bomb 8%. `#hudtriple` lists every active
+timer. (Overdrive was cut: it overlapped the interceptor's auto-fire and
+lock-in.)
 
 **Ship motion** — cosmetic only (shots always leave from the centre):
 `shipX`/`shipVX` is a damped spring toward `sin(aimAngle)`, so the ship
 glides along the bottom and banks into the slide; plus idle bob,
 `shipRecoil` kick per shot, `shipHitWobble` shudder on damage, flickering
-thruster flames (orange under overdrive) and the shield cage.
+thruster flames (flaring on a boost pad) and a hex cage while plasma is
+overcharged.
 
 **Bullseye** — `findAimTarget()` picks the nearest enemy (or the boss)
 within the bolt hit tolerance of the aim; `drawBullseye()` puts a rotating
@@ -285,6 +290,8 @@ ship's lane (`inShipLane()`, `LANE_HIT`); near misses call out DODGED!.
 **Three bars** — HULL; PLSM, a plasma shield (`PLASMA_FRACTION` of the
 hull) that takes hits first and recharges after `PLASMA_REGEN_DELAY`; PWR,
 charged `POWER_PER_KILL` per kill. The bomb (zapper) shows as `BOMB x1`.
+In cockpit view these bars hide (`body.cockpitview`): the dashboard dials
+show them instead.
 
 **Lock-in** — with PWR full, L or the LOCK button: for `LOCKIN_DURATION`
 the ship flies a tighter ring further in, can ride the whole 360°, slides

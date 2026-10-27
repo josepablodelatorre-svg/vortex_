@@ -16,6 +16,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   console.log('  lane/rot/aim', a, '->', b2);
   ok(a === b2, 'aim, lane and view settle (no runaway spin)');
   ok(Math.abs(await ev('viewRot')) > 0.2, 'the world has turned to follow the lane');
+  ok(await ev(`getComputedStyle(document.getElementById('hullrow')).display`) === 'none' && await ev(`getComputedStyle(document.getElementById('hudtop')).display`) !== 'none', 'cockpit hides the duplicate HUD bars (the dashboard shows them)');
   for (let i = 0; i < 5; i++) await ev(`spawnEnemy(${-0.8 + i * 0.4}, 'drone'); enemies.at(-1).z = 0.4 + ${i} * 0.1;`);
   await ev('damageShip(5)'); await p.waitForTimeout(150);
   await p.screenshot({ path: process.argv[2] + '/cockpit.png' });

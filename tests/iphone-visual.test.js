@@ -23,7 +23,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await ev('hull = hullMax; briefingTimer = 0.01; for (let i = 0; i < 4; i++) spawnEnemy()');
   await p.waitForTimeout(1200);
   await p.screenshot({ path: process.argv[2] + '/ip-play.png' });
-  for (let i = 0; i < 20 && await ev(`state === 'playing'`); i++) { await ev('shieldTimer = 0; damageShip(99999)'); await p.waitForTimeout(100); }
+  for (let i = 0; i < 20 && await ev(`state === 'playing'`); i++) { await ev('plasma = 0; damageShip(99999)'); await p.waitForTimeout(100); }
   await p.waitForTimeout(400);
   ok(await ev('state') === 'gameover', 'game over shows');
   await p.screenshot({ path: process.argv[2] + '/ip-over.png' });

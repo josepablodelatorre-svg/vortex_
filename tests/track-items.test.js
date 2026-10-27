@@ -19,7 +19,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(await ev('brakeTimer > 0 && boostTimer === 0'), 'a pad outside your lane does nothing');
   await put('hoop', 0); await wait(150);
   ok(await ev('tripTimer > 2') && (await ev('canvas.style.filter')).includes('hue-rotate'), 'a hoop starts the psychedelic trip');
-  ok(await ev('tripleLaserTimer > 0 || echoTimer > 0 || shieldTimer > 0 || overdriveTimer > 0 || discCharges > 0'), 'a hoop grants an ability');
+  ok(await ev('tripleLaserTimer > 0 || echoTimer > 0 || plasma > plasmaMax || discCharges > 0'), 'a hoop grants an ability');
   const lane0 = await ev('shipLane');
   await p.mouse.move(800, 715); await wait(500);
   const laneBefore = await ev('shipLane');
