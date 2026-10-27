@@ -1,0 +1,46 @@
+const { chromium } = require('playwright');
+const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
+(async () => {
+  const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
+  const A = await (await b.newContext({ viewport: { width: 1000, height: 720 } })).newPage();
+  const B = await (await b.newContext({ viewport: { width: 1000, height: 720 } })).newPage();
+  const errs = [];
+  A.on('pageerror', e => errs.push('A: ' + e.message)); B.on('pageerror', e => errs.push('B: ' + e.message));
+  const a = (x) => A.evaluate(x), bb = (x) => B.evaluate(x);
+  const waitFor = async (pg, expr, ms = 10000) => { for (let i = 0; i < ms / 100; i++) { if (await pg.evaluate(expr)) return true; await pg.waitForTimeout(100); } return false; };
+  // solo vs AI
+  await A.goto('http://127.0.0.1:8765/index.html?peerhost=127.0.0.1:9000'); await a('localStorage.clear()'); await A.reload(); await A.waitForTimeout(300);
+  await A.evaluate(v => { document.getElementById('pilotname').value = v; }, 'ada');
+  await A.evaluate(sel => document.querySelector(sel).click(), '#cyclesBtn');
+  await waitFor(A, 'netId');
+  ok((await a(`document.querySelector('#lobby h2').textContent`)) === 'DAEMONS', 'DAEMONS lobby with QR');
+  const url = await a('cyclesUrl()');
+  // friend joins
+  await B.goto(url); await B.waitForTimeout(400);
+  await B.evaluate(v => { document.getElementById('pilotname').value = v; }, 'linus');
+  await B.click('#lobbyAccept');
+  ok(await waitFor(A, '!!cyConn && cyGuestName === "LINUS"'), 'friend LINUS joins the grid');
+  await A.click('#lobbyStart');
+  ok(await waitFor(A, 'state === "cycles"') && await waitFor(B, 'state === "cycles"'), 'round starts on both screens');
+  ok(await a('cyRiders.map(r => r.name).join(",")') === 'ADA,LINUS,SYSLOGD,SSHD', 'riders: ADA, LINUS + 2 AI');
+  ok(await bb('cyMe') === 1, 'guest controls rider 2');
+  await waitFor(A, 'cyRiders[1].trail.length > 5'); await A.waitForTimeout(300);
+  const trailA = await a('cyRiders[1].trail.length'), trailB = await bb('cyRiders[1].trail.length');
+  ok(trailA > 5 && Math.abs(trailA - trailB) <= 3, 'guest mirrors the host simulation (' + trailA + ' vs ' + trailB + ' cells)');
+  const d0 = await a('cyRiders[1].dir');
+  await B.keyboard.press('ArrowRight'); await A.waitForTimeout(300);
+  ok(await a('cyRiders[1].dir') === (d0 + 1) % 4 || !(await a('cyRiders[1].alive')), 'guest turn reaches the host');
+  const myDir = await a('cyRiders[0].dir');
+  await A.keyboard.press('ArrowLeft'); await A.waitForTimeout(200);
+  ok(await a('cyRiders[0].dir') === (myDir + 3) % 4 || !(await a('cyRiders[0].alive')), 'host turns left with the arrow key');
+  await A.screenshot({ path: process.argv[2] + '/cycles.png' });
+  ok(await waitFor(A, 'state === "cyclesover"', 60000) && await waitFor(B, 'state === "cyclesover"', 5000), 'round ends with a winner on both screens');
+  console.log('  banner:', await a(`document.getElementById('levelbanner').textContent`));
+  await A.screenshot({ path: process.argv[2] + '/cycles-end.png' });
+  await B.mouse.click(500, 400);
+  ok(await waitFor(A, 'state === "cycles"') && await waitFor(B, 'state === "cycles"'), 'guest click starts the next round');
+  await A.keyboard.press('Escape');
+  ok(await a('state') === 'title', 'ESC returns the host to the title');
+  console.log('errors', JSON.stringify(errs));
+  await b.close();
+})();

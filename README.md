@@ -539,3 +539,9 @@ couple of GitHub resource lists:
 Shipped since the last export: ship/accent color customization, local
 high score + furthest-run tracking, and screen shake — all three were on
 this list before and are now built (see Architecture above).
+
+## Tests
+
+Headless browser tests live in `tests/` (Playwright). `cd tests && npm
+install && npm test` runs them all against a local server; see
+`tests/README.md`.

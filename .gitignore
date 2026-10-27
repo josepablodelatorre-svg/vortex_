@@ -1,2 +1,4 @@
 .DS_Store
 *.zip
+tests/node_modules
+tests/shots/

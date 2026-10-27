@@ -1,0 +1,13 @@
+{
+  "name": "vortex-tests",
+  "private": true,
+  "description": "Headless browser tests for VORTEX",
+  "scripts": {
+    "test": "node run.js"
+  },
+  "devDependencies": {
+    "express": "^4.22.3",
+    "peer": "^1.0.2",
+    "playwright": "^1.63.0"
+  }
+}
