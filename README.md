@@ -330,11 +330,18 @@ twice as fast and auto-fires; power drains as it runs.
 
 **Track objects** — `trackItems` spawn every few seconds in lanes on the
 ship's arc and ride in with the tunnel; reaching the rim inside the ship's
-lane (`TRACK_HIT`) triggers them (`triggerTrackItem()`): `boost` arrow pad
-(`padSpeed()`/`padPull()` ×2.2/×1.35 for `PAD_TIME`, +100), `brake` zebra
-pad (×0.5/×0.6), psychedelic `hoop` (a random pickup + `tripTimer`, a
-hue-rotate CSS filter on the canvas) and `portal` (teleports the ship to
-the mirror lane, or straight across the ring during lock-in).
+lane (`TRACK_HIT`) triggers them (`triggerTrackItem()`). Floor pads come
+as a path of `PAD_SEGMENTS` glowing strips down one lane, labelled on the
+nearest segment, and trigger once per path (`row`): `boost` (yellow,
+arrows pointing away into the tunnel: `padSpeed()`/`padPull()` ×2.2/×1.35
+for `PAD_TIME`, +100), `brake` (cyan, arrows pointing back at the ship:
+×0.5/×0.6) and `zebra` (black-and-white stripes: SCORE x2 on kills for
+`x2Timer`). The psychedelic `hoop` (a random pickup + `tripTimer`, a
+hue-rotate CSS filter) and `portal` (teleports the ship to the mirror lane,
+or across the ring in lock-in; `teleportHold` keeps it there a second)
+grow big and slide onto the ship's flight line as they arrive, and the
+ship bursts through a ring of them (`passRings`). Coins shatter into gold
+pixels when grabbed.
 
 **Warship bosses** — `drawBoss()` draws bosses head-on as ships:
 `drawGunship()` (miniboss), `drawDreadnought()` (level boss) and

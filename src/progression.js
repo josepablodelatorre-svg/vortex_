@@ -33,6 +33,8 @@ let trackItems = [];   // { kind, angle, z }
 let trackTimer = 6;
 let boostTimer = 0, brakeTimer = 0, tripTimer = 0;
 let teleportFlash = 0;
+let x2Timer = 0;      // zebra pad: every kill scores double while it runs
+let passRings = [];   // hoops/portals the ship just flew through: { t0, color, rainbow }
 let teleportHold = 0; // seconds the ship stays in its new lane after a portal
 // warp ink: hitting warp speed drains the colour and inverts the screen, so
 // the speed lines turn into black ink strokes on white, for INK_TIME
@@ -47,15 +49,27 @@ function padPull() {
   return boostTimer > 0 ? 1.35 : brakeTimer > 0 ? 0.6 : 1;
 }
 
+// Floor pads come as a short path of segments down one lane, so the lane
+// leading into them reads from far off. Arrows pointing AWAY into the
+// tunnel speed you up (boost); arrows pointing back TOWARD the ship slow
+// you down (brake); the zebra strip doubles your score for a while (x2).
+// Touching any segment of a path triggers it once.
+const PAD_SEGMENTS = 4;
+let padRowId = 0;
 function spawnTrackItem() {
   const r = Math.random();
   // coin rows are the most common thing on the floor
-  if (r < 0.4) { spawnCoinRow(); return; }
+  if (r < 0.38) { spawnCoinRow(); return; }
   const r2 = Math.random();
-  const kind = r2 < 0.33 ? 'boost' : r2 < 0.58 ? 'brake' : r2 < 0.8 ? 'hoop' : 'portal';
+  const kind = r2 < 0.26 ? 'boost' : r2 < 0.46 ? 'brake' : r2 < 0.62 ? 'zebra' : r2 < 0.84 ? 'hoop' : 'portal';
   // somewhere on the ship's arc: 3 to 9 o'clock (anywhere during lock-in)
   const angle = lockinTimer > 0 ? normalizeAngle(Math.random() * Math.PI * 2)
     : normalizeAngle(Math.PI + (Math.random() - 0.5) * Math.PI * 0.95);
+  if (kind === 'boost' || kind === 'brake' || kind === 'zebra') {
+    const row = ++padRowId;
+    for (let k = 0; k < PAD_SEGMENTS; k++) trackItems.push({ kind, angle, z: 1 + k * 0.1, row, seg: k });
+    return;
+  }
   trackItems.push({ kind, angle, z: 1 });
 }
 
@@ -69,6 +83,12 @@ function triggerTrackItem(it) {
     playBass(140, 0.3);
     triggerShake(5, 0.4);
     say('boost', { en: ['IN THE PIPE, FIVE BY FIVE!', 'HANG ON, PILOT, WE ARE FLYING!'], es: ['¡EN EL TUBO, CINCO POR CINCO!', '¡AGARRATE, PILOTO, VAMOS VOLANDO!'] }, 1, 10);
+  } else if (it.kind === 'zebra') {
+    x2Timer = PAD_TIME * 2;
+    shipCallout('SCORE x2', '#ffffff');
+    playPowerUp();
+    triggerShake(3, 0.25);
+    say('zebra', { en: ['DOUBLE POINTS! MAKE EVERY SHOT COUNT!', 'SCORE DOUBLER ONLINE. LIGHT THEM UP!'], es: ['¡PUNTOS DOBLES! ¡QUE CADA TIRO CUENTE!', 'DOBLE PUNTUACION ACTIVA. ¡ACABALOS!'] }, 1, 10);
   } else if (it.kind === 'brake') {
     brakeTimer = PAD_TIME; boostTimer = 0;
     shipCallout('SLOW-MO', '#ffffff');
@@ -76,6 +96,7 @@ function triggerTrackItem(it) {
     say('brake', { en: ['EASY. KEEP YOUR VELOCITY DOWN.', 'BREATHE, PILOT. LINE UP YOUR SHOTS.'], es: ['CALMA. BAJA LA VELOCIDAD.', 'RESPIRA, PILOTO. APUNTA BIEN.'] }, 1, 10);
   } else if (it.kind === 'hoop') {
     tripTimer = 2.8;
+    passRings.push({ t0: t, rainbow: true });
     const gifts = ['star', 'echo', 'shield', 'disc'];
     collectPowerup({ angle: it.angle, z: 0.02, alive: true, kind: gifts[Math.floor(Math.random() * gifts.length)] });
     say('hoop', { en: ['WHAT WAS THAT?! YOU ARE GLOWING, PILOT!', 'WHOA. EVERYTHING IS... COLOURS.'], es: ['¡¿QUE FUE ESO?! ¡ESTAS BRILLANDO, PILOTO!', 'UF. TODO ES... COLORES.'] }, 2, 10);
@@ -91,6 +112,7 @@ function triggerTrackItem(it) {
     shatter(pos.x, pos.y, '200,120,255', 40, 1.4);
     playHack();
     shipCallout('TELEPORT!', '#c878ff');
+    passRings.push({ t0: t, color: '#c878ff' });
     say('portal', { en: ['ROLL, PILOT, ROLL!', 'WHERE DID YOU... OH. NICE.'], es: ['¡GIRA, PILOTO, GIRA!', '¿A DONDE TE... AH. BIEN.'] }, 1, 10);
   }
 }
@@ -98,6 +120,8 @@ function triggerTrackItem(it) {
 function updateTrack(dt) {
   boostTimer = Math.max(0, boostTimer - dt);
   brakeTimer = Math.max(0, brakeTimer - dt);
+  x2Timer = Math.max(0, x2Timer - dt);
+  passRings = passRings.filter(p => t - p.t0 < 0.45);
   tripTimer = Math.max(0, tripTimer - dt);
   teleportFlash = Math.max(0, teleportFlash - dt * 3);
   inkTimer = Math.max(0, inkTimer - dt);
@@ -155,8 +179,10 @@ function updateTrack(dt) {
           missionEvent('coin');
           it.got = true;
           playCoin();
-          // a gold sparkle and a +1 where it was grabbed
-          burst(it.angle, 0.04, { color: '255,210,63', bitColor: '#ffd23f', label: '+1', labelColor: '#ffe680' });
+          // it breaks apart into gold pixels where it was grabbed, with a +1
+          const cpt = pointOnRing(it.angle, it.z);
+          shatter(cpt.x + (CX - cpt.x) * 0.05, cpt.y + (CY - cpt.y) * 0.05, '255,210,63', 22, 0.9);
+          burst(it.angle, it.z, { color: '255,210,63', bitColor: '#ffd23f', label: '+1', labelColor: '#ffe680' });
         }
       }
       if (!it.done && it.z <= 0) it.done = true; // missed
@@ -164,10 +190,38 @@ function updateTrack(dt) {
     }
     if (it.z <= 0.03 && !it.done) {
       it.done = true;
-      if (inShipLane(it.angle, TRACK_HIT)) triggerTrackItem(it);
+      if (inShipLane(it.angle, TRACK_HIT)) {
+        // a pad path triggers once, on the first segment you touch
+        if (it.row) {
+          for (const o of trackItems) if (o.row === it.row) o.done = true;
+        }
+        triggerTrackItem(it);
+      }
     }
   }
   trackItems = trackItems.filter(it => it.z > -0.05);
+}
+
+// the hoop or portal the ship just flew through, opening out around it
+function drawPassRings() {
+  if (!passRings.length || state !== 'playing') return;
+  const pos = viewMode === 'cockpit' ? { x: CX, y: cockpitLayout().vy1 - 40 } : shipScreenPos(shipLane);
+  ctx.save();
+  for (const p of passRings) {
+    const k = (t - p.t0) / 0.45;
+    const r = 40 + 160 * k;
+    ctx.globalAlpha = 1 - k;
+    ctx.lineWidth = 6 * (1 - k) + 1;
+    for (let s = 0; s < 12; s++) {
+      ctx.strokeStyle = p.rainbow ? `hsl(${(s * 30 + t * 300) % 360}, 100%, 60%)` : p.color;
+      ctx.shadowColor = ctx.strokeStyle;
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.ellipse(pos.x, pos.y, r, r * 0.6, 0, (s / 12) * Math.PI * 2, ((s + 1) / 12) * Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
 }
 
 // a flat patch on the tunnel wall: four corners at angle ± half, z .. z + len
@@ -224,46 +278,73 @@ function drawTrackItems() {
       ctx.shadowBlur = 0;
       continue;
     }
-    if (it.kind === 'boost' || it.kind === 'brake') {
-      const quad = wallPatch(it.angle, 0.17, it.z, 0.09);
+    if (it.kind === 'boost' || it.kind === 'brake' || it.kind === 'zebra') {
+      if (it.done) continue;
+      // one segment of a pad path: a wide glowing strip on the floor
+      const quad = wallPatch(it.angle, 0.24, it.z, 0.085);
+      const pulse = 0.5 + 0.5 * Math.sin(t * 8 - it.seg * 1.2);
+      const look = {
+        boost: { fill: `rgba(255,225,77,${0.22 + 0.25 * near})`, line: '#ffe14d' },
+        brake: { fill: `rgba(60,200,255,${0.18 + 0.22 * near})`, line: '#7fe7ff' },
+        zebra: { fill: `rgba(255,255,255,${0.2 + 0.25 * near})`, line: '#ffffff' }
+      }[it.kind];
       ctx.beginPath();
       quad.forEach((pt, i) => i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
       ctx.closePath();
-      ctx.fillStyle = it.kind === 'boost' ? `rgba(255,225,77,${0.25 + 0.3 * near})` : `rgba(255,255,255,${0.12 + 0.2 * near})`;
+      ctx.fillStyle = look.fill;
       ctx.fill();
       ctx.lineWidth = 1 + 2 * near;
-      if (it.kind === 'boost') {
-        // three chevrons pointing toward the player
-        ctx.strokeStyle = '#ffe14d';
-        ctx.shadowColor = '#ffe14d';
-        ctx.shadowBlur = 12;
-        for (let k = 0; k < 3; k++) {
-          const zz = it.z + 0.015 + k * 0.025;
-          const l = pointOnRing(it.angle - 0.13, zz + 0.02), m = pointOnRing(it.angle, zz), r = pointOnRing(it.angle + 0.13, zz + 0.02);
-          ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(m.x, m.y); ctx.lineTo(r.x, r.y); ctx.stroke();
-        }
-      } else {
-        // zebra stripes across the pad
+      ctx.strokeStyle = look.line;
+      ctx.shadowColor = look.line;
+      ctx.shadowBlur = 8 + 10 * pulse;
+      ctx.stroke();
+      if (it.kind === 'zebra') {
+        // black and white stripes across it
+        ctx.shadowBlur = 0;
         ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2 + 4 * near;
+        ctx.lineWidth = 2 + 6 * near;
         for (let k = 0; k < 4; k++) {
-          const zz = it.z + 0.01 + k * 0.022;
-          const a = pointOnRing(it.angle - 0.17, zz), b = pointOnRing(it.angle + 0.17, zz);
+          const zz = it.z + 0.01 + k * 0.021;
+          const a = pointOnRing(it.angle - 0.22, zz), b = pointOnRing(it.angle + 0.22, zz);
           ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
         }
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        quad.forEach((pt, i) => i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
-        ctx.closePath();
-        ctx.stroke();
+      } else {
+        // big chevrons: boost points away into the tunnel, brake back at you
+        const away = it.kind === 'boost';
+        ctx.lineWidth = 2 + 4 * near;
+        ctx.strokeStyle = look.line;
+        for (let k = 0; k < 2; k++) {
+          const zz = it.z + 0.02 + k * 0.035;
+          const tip = away ? zz + 0.025 : zz, wing = away ? zz : zz + 0.025;
+          const l = pointOnRing(it.angle - 0.17, wing), m = pointOnRing(it.angle, tip), r = pointOnRing(it.angle + 0.17, wing);
+          ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(m.x, m.y); ctx.lineTo(r.x, r.y); ctx.stroke();
+        }
       }
       ctx.shadowBlur = 0;
+      // the nearest segment of each path says what it does
+      if (it.seg === 0 && near > 0.35) {
+        const mid = pointOnRing(it.angle, it.z + 0.04);
+        ctx.font = `${Math.round(8 + 12 * near)}px 'Press Start 2P', monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = look.line;
+        ctx.globalAlpha = Math.min(1, (near - 0.35) * 3);
+        const lx = mid.x + (CX - mid.x) * 0.12, ly = mid.y + (CY - mid.y) * 0.12;
+        const label = T({ boost: 'FAST', brake: 'SLOW', zebra: 'x2' }[it.kind]);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'rgba(5,0,15,0.85)';
+        ctx.strokeText(label, lx, ly);
+        ctx.fillText(label, lx, ly);
+        ctx.globalAlpha = 1;
+      }
     } else {
+      // far off they hover over their lane; close in they line up with the
+      // ship's flight path in that lane, big enough for it to fly through
       const pt = pointOnRing(it.angle, it.z);
-      // hovering a little off the wall, toward the centre
-      const x = pt.x + (CX - pt.x) * 0.08, y = pt.y + (CY - pt.y) * 0.08;
-      const r = 6 + 34 * near;
+      const ship = shipScreenPos(it.angle);
+      const k = Math.pow(near, 3);
+      const x = (pt.x + (CX - pt.x) * 0.08) * (1 - k) + ship.x * k;
+      const y = (pt.y + (CY - pt.y) * 0.08) * (1 - k) + ship.y * k;
+      const r = 10 + 70 * near * near;
       if (it.kind === 'hoop') {
         ctx.lineWidth = 2 + 4 * near;
         for (let k = 0; k < 12; k++) {
@@ -295,6 +376,7 @@ function drawTrackItems() {
     }
   }
   ctx.restore();
+  drawPassRings();
   if (teleportFlash > 0) {
     ctx.fillStyle = `rgba(200,120,255,${0.25 * teleportFlash * flashScale()})`;
     ctx.fillRect(0, 0, W, H);

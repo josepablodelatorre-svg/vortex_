@@ -283,7 +283,7 @@ function triggerNova() {
   for (const e of enemies) {
     if (!e.alive) continue;
     e.alive = false;
-    score += Math.round((e.type === 'pentagram' ? 30 : 10) * (gameMode === 'rift' ? riftMultiplier() : 1) * missionMult());
+    score += Math.round((e.type === 'pentagram' ? 30 : 10) * (gameMode === 'rift' ? riftMultiplier() : 1) * missionMult() * (x2Timer > 0 ? 2 : 1));
     killCount += 1;
     versusKill();
     missionEvent('kill');
@@ -374,6 +374,7 @@ function updateTripleUI() {
   if (echoTimer > 0) lines.push('ECHO ' + echoTimer.toFixed(1) + 's');
   if (discCharges > 0) lines.push('DISC x' + discCharges);
   if (boostTimer > 0) lines.push('BOOST ' + boostTimer.toFixed(1) + 's');
+  if (x2Timer > 0) lines.push('SCORE x2 ' + x2Timer.toFixed(1) + 's');
   if (brakeTimer > 0) lines.push('SLOW-MO ' + brakeTimer.toFixed(1) + 's');
   el.textContent = lines.join('\n');
   el.style.display = lines.length ? 'block' : 'none';

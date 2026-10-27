@@ -54,7 +54,7 @@ function startGame(continuing, mode) {
   lockinBlend = 0;
   trackItems = [];
   trackTimer = 6;
-  boostTimer = 0; brakeTimer = 0; tripTimer = 0; inkTimer = 0; teleportHold = 0;
+  boostTimer = 0; brakeTimer = 0; tripTimer = 0; inkTimer = 0; teleportHold = 0; x2Timer = 0; passRings = [];
   lockinAnnounced = false;
   shipLane = Math.PI;
   shipLaneVel = 0;

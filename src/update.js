@@ -223,7 +223,7 @@ function update(dt) {
     }
 
     // pickup timers count down to nothing
-    if (tripleLaserTimer > 0 || boostTimer > 0 || brakeTimer > 0) {
+    if (tripleLaserTimer > 0 || boostTimer > 0 || brakeTimer > 0 || x2Timer > 0) {
       tripleLaserTimer = Math.max(0, tripleLaserTimer - dt);
       updateTripleUI();
     }
@@ -360,7 +360,7 @@ function update(dt) {
             }
           }
           e.alive = false;
-          score += Math.round((e.type === 'pentagram' ? 30 : 10) * (gameMode === 'rift' ? riftMultiplier() : 1) * missionMult());
+          score += Math.round((e.type === 'pentagram' ? 30 : 10) * (gameMode === 'rift' ? riftMultiplier() : 1) * missionMult() * (x2Timer > 0 ? 2 : 1));
           killCount += 1;
           killStreak += 1;
           versusKill();

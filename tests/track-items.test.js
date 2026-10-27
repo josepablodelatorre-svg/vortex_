@@ -21,6 +21,17 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await put('hoop', 0); await p.waitForFunction(() => tripTimer > 2 && canvas.style.filter.includes('hue-rotate'), null, { timeout: 4000 }).catch(() => {});
   ok(await ev('tripTimer > 2') && (await ev('canvas.style.filter')).includes('hue-rotate'), 'a hoop starts the psychedelic trip');
   ok(await ev('tripleLaserTimer > 0 || echoTimer > 0 || plasma > plasmaMax || discCharges > 0'), 'a hoop grants an ability');
+  // zebra: score x2 while it runs
+  await put('zebra', 0); await p.waitForFunction('x2Timer > 0', null, { timeout: 3000 }).catch(() => {});
+  ok(await ev('x2Timer > 5'), 'the zebra pad starts SCORE x2');
+  await ev(`score = 0; enemies = []; spawnEnemy(aimAngle, 'drone'); enemies[0].z = 0.3; enemies[0].speed = 0; bolts.push({ angle: enemies[0].angle, z: 0.3 })`);
+  await p.waitForFunction('score > 0', null, { timeout: 3000 }).catch(() => {});
+  ok(await ev('score') === Math.round(20 * await ev('missionMult()')), 'kills score double under x2 (' + await ev('score') + ')');
+  // a pad path triggers once, however many segments you cross
+  await ev(`x2Timer = 0; boostTimer = 0; brakeTimer = 0; missionState.active = []; const row = ++padRowId; for (let k = 0; k < PAD_SEGMENTS; k++) trackItems.push({ kind: 'boost', angle: shipLane, z: 0.02 + k * 0.05, row, seg: k })`);
+  let boosts = 0, last = 0;
+  for (let i = 0; i < 30; i++) { const b = await ev('boostTimer'); if (b > last + 0.5) boosts++; last = b; await p.waitForTimeout(40); }
+  ok(boosts === 1, 'a pad path of ' + await ev('PAD_SEGMENTS') + ' segments triggers once (' + boosts + ')');
   const lane0 = await ev('shipLane');
   await p.mouse.move(800, 715); await wait(500);
   const laneBefore = await ev('shipLane');

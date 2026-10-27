@@ -594,7 +594,7 @@ function drawBoss() {
 function drawPowerups() {
   for (const p of powerups) {
     const pt = pointOnRing(p.angle, p.z);
-    const size = Math.max(4, 17 * (1 - p.z) + 5);
+    const size = Math.max(6, 26 * (1 - p.z) + 8);
     ctx.save();
     ctx.translate(pt.x, pt.y);
     if (p.kind === 'disc') {

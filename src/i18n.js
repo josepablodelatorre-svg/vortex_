@@ -96,6 +96,7 @@ const UI_ES = {
   'DODGED!': '¡ESQUIVADO!', 'OVERCHARGE!': '¡SOBRECARGA!', '+1 BOMB': '+1 BOMBA', 'TRIPLE LASER!': '¡LASER TRIPLE!',
   'ECHO!': '¡ECO!', 'LAMBDA DISC!': '¡DISCO LAMBDA!', 'NICE!': '¡BIEN!', 'OBJECTIVE COMPLETE': 'OBJETIVO CUMPLIDO',
   'LOCK-IN READY': 'MODO FIJAR LISTO', 'LOCK-IN READY [L]': 'MODO FIJAR LISTO [L]', 'SLOW-MO': 'CAMARA LENTA', 'BOOST': 'TURBO',
+  'FAST': 'RAPIDO', 'SLOW': 'LENTO', 'SCORE x2': 'PUNTOS x2', 'TELEPORT!': '¡TELETRANSPORTE!', 'BOOST +100': 'TURBO +100',
   // cockpit dashboard
   'LOCK ON': 'FIJADO', 'SCAN': 'BUSCANDO', 'LOCK-IN': 'FIJAR', 'SPD': 'VEL', 'HP': 'VIDA', 'FLIGHT': 'VUELO', 'ORBIT': 'ORBITA', 'COMBAT': 'COMBATE',
   // burst labels
@@ -152,6 +153,7 @@ const UI_ES_PATTERNS = [
   [/^DISC x(\d+)$/, 'DISCO x$1'],
   [/^BOOST (.+)s$/, 'TURBO $1s'],
   [/^SLOW-MO (.+)s$/, 'CAMARA LENTA $1s'],
+  [/^SCORE x2 (.+)s$/, 'PUNTOS x2 $1s'],
   [/^(CRT|VIEW|GLOW|VIBRATION|FLASHING|LANGUAGE): (.+)$/, (m, k, v) => T(k) + ': ' + T(v)],
   [/^ACHIEVEMENT: (.+)$/, 'LOGRO: $1'],
   [/^NEW SHIP COLOR: (.+)$/, 'NUEVO COLOR DE NAVE: $1'],
