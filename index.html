@@ -2053,6 +2053,7 @@ function continueFromCheckpoint() {
     missionTime = cp.missionTime;
     nextMinibossIndex = cp.nextMinibossIndex;
     updateObjectiveUI();
+    midSaved = true;
     saveCheckpoint(true); // keep the midway point, not just the level start
   }
 }
@@ -2782,22 +2783,19 @@ const ENV = {
   space:    { swirl: 0.3, bend: 0.4, sx: 1,   sy: 1,    rot: 0,           rough: 0, tunnel: 0, spawn: 1.7, name: 'OPEN SPACE' },
   surface:  { swirl: 0,   bend: 0.3, sx: 1,   sy: 1,    rot: 0,           rough: 0, tunnel: 0, spawn: 1.15, name: 'PLANET SURFACE' }
 };
-const LEVEL_ROUTES = [
-  ['tube', 'space', 'tube'],
-  ['trench', 'asteroid'],
-  ['space'],                       // a whole level out in the open: the breather
-  ['surface', 'tube'],
-  ['asteroid', 'trench', 'tube']
-];
+// one map per level: the scenery only changes when a boss goes down
+const LEVEL_ENVS = ['tube', 'asteroid', 'space', 'trench', 'surface'];
 const RIFT_ENVS = ['tube', 'trench', 'asteroid', 'space', 'surface'];
+let midSaved = false;    // this level's midway checkpoint is already stored
+let ventSpawned = false; // this level's trench vent is already on its way
 let env = 'tube';
 const envK = { ...ENV.tube };
 let envFlash = 0;
 
 function routeEnv() {
-  if (gameMode === 'rift') return RIFT_ENVS[(riftDepth - 1) % RIFT_ENVS.length];
-  const route = LEVEL_ROUTES[(currentLevel - 1) % LEVEL_ROUTES.length];
-  return route[Math.min(route.length - 1, Math.floor(missionProgress() * route.length))];
+  // the Rift moves on to the next map at each boss gate
+  if (gameMode === 'rift') return RIFT_ENVS[Math.floor((riftDepth - 1) / RIFT_BOSS_EVERY) % RIFT_ENVS.length];
+  return LEVEL_ENVS[(currentLevel - 1) % LEVEL_ENVS.length];
 }
 
 const ENV_LINES = {
@@ -2814,9 +2812,6 @@ function setEnv(name, quiet) {
   env = name;
   envFlash = quiet ? 0 : 1;
   tunnelSidesTarget = name === 'trench' ? 4 : (gameMode === 'rift' ? pickRiftShape() : computeShapeStage());
-  if (leaving === 'trench' && !quiet) spawnVent();
-  // (a miniboss fight can be under way: continuing just skips that miniboss)
-  if (!quiet && gameMode === 'campaign' && state === 'playing') saveCheckpoint(true);
   if (!quiet) {
     showLevelBanner(ENV[name].name);
     say('env-' + name, ENV_LINES[name], 2, 20);
@@ -2828,7 +2823,21 @@ function updateEnv(dt) {
   const k = Math.min(1, dt * 1.4);
   for (const key of ['swirl', 'bend', 'sx', 'sy', 'rot', 'rough', 'tunnel']) envK[key] += (target[key] - envK[key]) * k;
   envFlash = Math.max(0, envFlash - dt * 1.5);
-  if (state === 'playing' && !calmPhase()) setEnv(routeEnv());
+  if (state !== 'playing' || calmPhase()) return;
+  // halfway through a campaign level: store the midway checkpoint
+  // (a miniboss fight can be under way: continuing just skips that miniboss)
+  if (gameMode === 'campaign' && !midSaved && missionProgress() >= 0.5) {
+    midSaved = true;
+    saveCheckpoint(true);
+  }
+  // the trench ends at its vent, just before the boss
+  const nearEnd = gameMode === 'rift'
+    ? riftDepth % RIFT_BOSS_EVERY === 0 && killCount >= RIFT_SECTOR_KILLS * 0.8
+    : missionProgress() >= 0.85;
+  if (env === 'trench' && !ventSpawned && !bossActive && nearEnd) {
+    ventSpawned = true;
+    spawnVent();
+  }
 }
 
 // the trench ends at a vent: one clean hit for a big bonus
@@ -4302,6 +4311,8 @@ function shipCallout(text, color) {
 function onLevelStart() {
   zapperCharges = 1 + up('bomb');
   if (currentLevel > 1) saveCheckpoint(false);
+  midSaved = false;
+  ventSpawned = false;
   if (gameMode === 'campaign') missionEvent('level', currentLevel);
   setEnv(routeEnv(), true);
   // the level banner names where this level starts

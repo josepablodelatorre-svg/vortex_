@@ -12,8 +12,8 @@ Pages (https://josepablodelatorre-svg.github.io/vortex_/). README.md has
 the architecture of each piece.
 - Start screens (splash, menu, hangar, multiplayer, upgrades, missions,
   settings), phone layout, EN/ES commander.
-- 5-level campaign of routes through five environments (tunnel, trench,
-  asteroids, open space, planet surface); THE RIFT; daily tunnel.
+- 5-level campaign, one environment per level, changing after each boss
+  (tunnel, asteroids, open space, trench, planet surface); THE RIFT; daily tunnel.
 - Dodging on a lower-half arc, plasma shield, power + lock-in, bombs.
 - Power-ups (hull, triple, shield, overdrive, echo, lambda disc, nova),
   floor pads, hoops, portals, warp with black-and-white ink.

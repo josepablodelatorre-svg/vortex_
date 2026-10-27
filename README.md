@@ -310,15 +310,18 @@ asteroid, space, surface) as numbers `envK` eases toward: vortex swirl,
 path bend, cross-section stretch/rotation (the trench is a wide flat-
 floored box), rocky ring noise, and how visible the tube is. They only
 change drawing (`pointOnRing` visual mode); hit tests are untouched.
-`LEVEL_ROUTES` gives each of the 5 campaign levels (`LEVEL_COUNT = 5`) a
-route, switched by mission progress (`routeEnv()` / `setEnv()`, with a
-banner, a flash and a commander line); level 3 is all open space, a
-breather (`ENV.space.spawn` = fewer enemies, faster pickups). The Rift
-cycles `RIFT_ENVS` by depth. `drawSpace()` = streaming stars, a spiral
+`LEVEL_ENVS` gives each of the 5 campaign levels (`LEVEL_COUNT = 5`) one
+map — tunnel, asteroids, open space, trench, planet surface — and the
+scenery only changes when a level's boss goes down and you warp
+(`routeEnv()` / `setEnv()` from `onLevelStart`). Level 3, open space, is
+the breather (`ENV.space.spawn` = fewer enemies, faster pickups). The Rift
+moves through `RIFT_ENVS` one map per boss gate (every `RIFT_BOSS_EVERY`
+depths). `drawSpace()` = streaming stars, a spiral
 galaxy and a black hole at the vanishing point; `drawSurface()` = sky,
 sun (or moon) and scrolling wireframe mountains (`noise2()`) with a flat
 valley down the middle. Trenches favour shooters (wall turrets) and end
-with a `vent` track item you must shoot (+500); asteroid fields add `rock`
+with a `vent` track item you must shoot (+500), sent at 85% of the level
+just before the boss (`ventSpawned`); asteroid fields add `rock`
 enemies (3 hp).
 
 **Warp ink** — `startWarp()` sets `inkTimer = INK_TIME` (7s): a CSS
@@ -344,8 +347,8 @@ the menu. Toasts now queue (`showToast` → `nextToast`) so several at
 once are each shown.
 
 **Checkpoints** — campaign only (not daily/Rift/versus). `saveCheckpoint()`
-at every level start from level 2 (`onLevelStart`) and midway, when the
-route changes scenery (`setEnv`), into `vortex-checkpoint` with level,
+at every level start from level 2 (`onLevelStart`) and once at 50% of the
+level's objective (`midSaved`, checked in `updateEnv`), into `vortex-checkpoint` with level,
 run tier, score and the mission progress. CONTINUE on SIGNAL LOST
 (`#contFromLost`) and in the menu (`#continueBtn`) call
 `continueFromCheckpoint()`. Beating the campaign clears it.
