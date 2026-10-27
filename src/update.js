@@ -106,6 +106,9 @@ function update(dt) {
     // move enemies toward player (z -> 0), pulled in a little faster as the vortex accelerates
     for (const e of enemies) {
       e.z -= e.speed * pullFactor * dt;
+      if (e.targetAngle !== undefined) {
+        e.angle = normalizeAngle(e.angle + normalizeAngle(e.targetAngle - e.angle) * Math.min(1, dt * 3));
+      }
       if (e.type === 'weaver') {
         e.angle = normalizeAngle(e.baseAngle + Math.sin(t * 2.0 + e.phase) * 0.45);
       }
@@ -135,9 +138,12 @@ function update(dt) {
     for (const e of enemies) {
       if (e.alive && e.z <= 0.03) {
         e.alive = false;
-        if (inShipLane(e.angle)) damageShip(HULL_DAMAGE_PER_HIT);
+        // big asteroids are wide and hit hard; their chunks are lighter
+        const width = e.type === 'rock' && !e.chunk ? LANE_HIT * 1.4 : LANE_HIT;
+        const dmg = e.type === 'rock' ? (e.chunk ? 12 : 24) : HULL_DAMAGE_PER_HIT;
+        if (inShipLane(e.angle, width)) damageShip(dmg);
         else { missionEvent('dodge'); tutorialEvent('dodge'); }
-        if (!inShipLane(e.angle) && inShipLane(e.angle, LANE_HIT * 2.2)) {
+        if (!inShipLane(e.angle, width) && inShipLane(e.angle, LANE_HIT * 2.2)) {
           shipCallout('DODGED!', '#9fffb0');
           say('dodge', { en: ['CLOSE ONE!', 'WATCH YOUR SIX, HOTSHOT!', 'NICE MOVES!'], es: ['¡POR POCO!', '¡CUIDA TU RETAGUARDIA!', '¡BUENOS REFLEJOS!'] }, 1, 12);
         }
@@ -348,7 +354,7 @@ function update(dt) {
       for (const e of enemies) {
         if (!e.alive) continue;
         let da = Math.abs(normalizeAngle(b.angle - e.angle));
-        if (da < 0.4 && Math.abs(b.z - e.z) < 0.14) {
+        if (da < (e.scale > 1.5 ? 0.55 : 0.4) && Math.abs(b.z - e.z) < 0.14) {
           if (!b.hidden && !b.echo) { runHits += 1; levelHits += 1; }
           b.z = 2; // remove
           if (e.hp) {
@@ -366,6 +372,9 @@ function update(dt) {
           versusKill();
           missionEvent('kill');
           if (e.type === 'rock') missionEvent('rock');
+          // a big asteroid breaks into chunks that tumble apart into the
+          // neighbouring lanes: shoot them or get out of their way
+          if (e.type === 'rock' && !e.chunk && e.z > 0.12) splitAsteroid(e);
           power = Math.min(100, power + POWER_PER_KILL * (1 + 0.15 * up('core')));
           updatePlasmaUI();
           if (killStreak > 0 && killStreak % 10 === 0) {
@@ -543,6 +552,19 @@ function normalizeAngle(a) {
   while (a > Math.PI) a -= Math.PI * 2;
   while (a < -Math.PI) a += Math.PI * 2;
   return a;
+}
+
+// big asteroid -> 2 or 3 chunks fanning out, a little faster than it was
+function splitAsteroid(rock) {
+  const offsets = Math.random() < 0.5 ? [-0.38, 0.38] : [-0.45, 0, 0.45];
+  for (const off of offsets) {
+    enemies.push({
+      angle: normalizeAngle(rock.angle + off * 0.3), targetAngle: normalizeAngle(rock.angle + off), z: rock.z,
+      shape: 'rock', type: 'rock', chunk: true, scale: 1.35, hp: 1, alive: true,
+      baseAngle: rock.angle + off, phase: Math.random() * Math.PI * 2, speed: rock.speed * 1.3
+    });
+  }
+  triggerShake(5, 0.2);
 }
 
 function burst(angle, z, opts) {

@@ -366,8 +366,10 @@ galaxy and a black hole at the vanishing point; `drawSurface()` = sky,
 sun (or moon) and scrolling wireframe mountains (`noise2()`) with a flat
 valley down the middle. Trenches favour shooters (wall turrets) and end
 with a `vent` track item you must shoot (+500), sent at 85% of the level
-just before the boss (`ventSpawned`); asteroid fields add `rock`
-enemies (3 hp).
+just before the boss (`ventSpawned`); asteroid fields add big `rock`
+enemies (`scale` 2.6, 4 hp, a wide lane, 24 damage) that split into 2-3
+chunks when shot (`splitAsteroid()`: they drift out into the neighbouring
+lanes, 1 hp, 12 damage); a few stray rocks turn up in other levels too.
 
 **Tutorial** — the first campaign run opens with a guided warm-up on
 level 1 (`TUTORIAL_STEPS`: aim, fire, kill three, dodge one, grab a

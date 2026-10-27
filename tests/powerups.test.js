@@ -41,6 +41,16 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(await ev('bolts[0].angle === enemies[0].angle'), 'and the shot goes down that enemy\'s lane');
   await ev('aimAngle = -2');
   ok(await ev('findAimTarget() === null'), 'no lock when nothing in line');
+  // asteroids: big, and they split into chunks when shot
+  await ev(`enemies = []; spawnEnemy(2.6, 'rock'); enemies[0].z = 0.5; enemies[0].speed = 0; enemies[0].hp = 1; bolts.push({ angle: 2.6, z: 0.5 })`);
+  await p.waitForFunction(() => enemies.some(e => e.chunk), null, { timeout: 3000 }).catch(() => {});
+  const chunks = await ev('enemies.filter(e => e.chunk).length');
+  ok(chunks >= 2 && await ev('enemies.every(e => e.chunk)'), 'a shot-down asteroid splits into ' + chunks + ' chunks');
+  await ev(`enemies = []; spawnEnemy(shipLane, 'rock'); enemies[0].z = 0.02; plasma = 0; hull = hullMax`);
+  await p.waitForFunction('hull < hullMax', null, { timeout: 3000 }).catch(() => {});
+  const rockDmg = await ev('hullMax - hull');
+  ok(rockDmg >= 20, 'a big asteroid hits hard (' + rockDmg + ')');
+  await ev('hull = hullMax');
   // spawn distribution
   const kinds = await ev(`(() => { powerups = []; const c = {}; for (let i=0;i<4000;i++) spawnPowerup(); for (const q of powerups) c[q.kind]=(c[q.kind]||0)+1; powerups = []; return c; })()`);
   const KINDS = ['hull', 'shield', 'star', 'bomb', 'echo', 'disc'];

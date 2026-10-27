@@ -207,7 +207,8 @@ let lastTime = performance.now();
 
 function pickEnemyType() {
   if (gameMode === 'rift' && riftMix) {
-    if (env === 'asteroid' && rng('enemy') < 0.3) return 'rock';
+    if (env === 'asteroid' && rng('enemy') < 0.4) return 'rock';
+    if (rng('enemy') < 0.05) return 'rock'; // the odd stray rock anywhere
     let roll = rng('enemy') * (riftMix.drone + riftMix.weaver + riftMix.shooter + riftMix.pentagram);
     for (const type of ['drone', 'weaver', 'shooter', 'pentagram']) {
       roll -= riftMix[type];
@@ -219,8 +220,10 @@ function pickEnemyType() {
   // the environment tilts the mix: trenches are lined with turrets
   // (shooters), asteroid fields are full of tumbling rocks
   if (env === 'trench' && roll < 0.45) return 'shooter';
-  if (env === 'asteroid' && roll < 0.35) return 'rock';
+  if (env === 'asteroid' && roll < 0.45) return 'rock';
   if (currentLevel === 1) return 'drone';
+  // a stray asteroid now and then outside the asteroid field
+  if (roll > 0.95) return 'rock';
   if (currentLevel === 2) return roll < 0.65 ? 'drone' : 'weaver';
   // level 3+: the galaxy's getting pulled apart out here, and something
   // hellish is riding the current in with everything else
@@ -247,7 +250,7 @@ function spawnEnemy(angleOverride, typeOverride) {
   };
   if (type === 'shooter') e.fireTimer = 1.6 + rng('enemy') * 1.4;
   if (type === 'pentagram') e.hp = 2; // takes two hits, a real threat to clear
-  if (type === 'rock') e.hp = 3;      // asteroids take a few hits to break
+  if (type === 'rock') { e.hp = 4; e.scale = 2.6; } // big asteroids take a few hits, then split
   enemies.push(e);
 }
 

@@ -286,7 +286,7 @@ const ENEMY_COLORS = {
 function drawEnemies() {
   for (const e of enemies) {
     const pt = pointOnRing(e.angle, e.z);
-    const size = Math.max(3, 18 * (1 - e.z) + 4);
+    const size = Math.max(3, 18 * (1 - e.z) + 4) * (e.scale || 1);
     const bright = pulseBrightness(e.angle, e.z);
     const glow = 10 + bright * 30;
     const col = ENEMY_COLORS[e.type] || ENEMY_COLORS.drone;
@@ -337,13 +337,24 @@ function drawEnemies() {
       });
       ctx.closePath();
     } else if (e.shape === 'rock') {
-      // a lumpy asteroid, its outline fixed per rock (seeded by its phase)
-      for (let i = 0; i < 9; i++) {
-        const a = (i / 9) * Math.PI * 2;
-        const rr = size * (0.85 + 0.45 * hash2(e.phase * 10, i));
+      // a lumpy asteroid, its outline fixed per rock (seeded by its phase),
+      // filled dark so it reads as solid, with a few craters
+      const n = e.chunk ? 7 : 13;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const rr = size * (0.7 + 0.55 * hash2(e.phase * 10, i));
         if (i === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
       }
       ctx.closePath();
+      ctx.fillStyle = 'rgba(40, 26, 18, 0.88)';
+      ctx.fill();
+      if (!e.chunk) {
+        for (let c = 0; c < 3; c++) {
+          const ca = hash2(e.phase * 7, c) * Math.PI * 2, cr = size * (0.15 + 0.15 * hash2(c, e.phase));
+          ctx.moveTo(Math.cos(ca) * size * 0.4 + cr, Math.sin(ca) * size * 0.4);
+          ctx.arc(Math.cos(ca) * size * 0.4, Math.sin(ca) * size * 0.4, cr, 0, Math.PI * 2);
+        }
+      }
     } else if (e.shape === 'squid') {
       // the weaver: an alien jellyfish (a dome with trailing tentacles), so
       // nothing hostile reads as one of the player's own interceptors
