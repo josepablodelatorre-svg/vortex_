@@ -7,18 +7,23 @@ to keep building with separate credits, read `README.md` first (full
 architecture map), then this file for where things stand.
 
 ## State as of this export
-- THE RIFT endless mode is DONE and verified (see README "THE RIFT").
-- Music-reactive tunnel (follows the ambient soundtrack's swells, not
-  beats) and streaking spark particles are DONE; the music reaction only
-  runs when the game is served over http(s), not opened via file://.
-- Per-level boss system with miniboss detours is DONE and verified (each
-  level: 7→miniboss, 13→miniboss, 20→real boss; boss defeat advances the
-  level and resets the counter — see README "Levels & bosses").
-- Screen shake, ship accent-color picker, and local best-score/furthest-
-  run tracking are DONE and verified this session (see README).
-- Soundtrack, NEMO INC. branding, New-Game-Plus escalation, polygon
-  tunnel morphing, pentagram enemies, triple-laser power-up, CRT toggle —
-  all shipped in earlier passes, documented in README.
+Everything below is built, tested in a headless browser and live on GitHub
+Pages (https://josepablodelatorre-svg.github.io/vortex_/). README.md has
+the architecture of each piece.
+- Start screens (splash, menu, hangar, multiplayer, upgrades, missions,
+  settings), phone layout, EN/ES commander.
+- 5-level campaign of routes through five environments (tunnel, trench,
+  asteroids, open space, planet surface); THE RIFT; daily tunnel.
+- Dodging on a lower-half arc, plasma shield, power + lock-in, bombs.
+- Power-ups (hull, triple, shield, overdrive, echo, lambda disc, nova),
+  floor pads, hoops, portals, warp with black-and-white ink.
+- Warship bosses, Watchdog, OVERSEER rival AI, missions, coins +
+  upgrades, daily streak, checkpoints, achievements, ranks, save clip.
+- Multiplayer over QR (bundled PeerJS): phone co-op, versus, Daemons.
+- Cockpit view.
+
+Parked for later: monetisation (ideas: cosmetics only, optional rewarded
+"revive once" ads, supporter pack) and the iPhone / Android / Steam ports.
 
 ## How changes were verified in this session (recommend continuing this)
 No test suite — instead:

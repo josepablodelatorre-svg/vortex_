@@ -2080,8 +2080,8 @@ function lockIn() {
   playPowerUp();
   playBass(55, 0.5);
   shipCallout('LOCK-IN!', '#ffe14d');
-  say('lockin', { en: ['LOCK BLASTERS IN ATTACK POSITION!', 'BLASTERS LOCKED! THE WHOLE RING IS YOURS!'],
-                  es: ['¡BLASTERS EN POSICION DE ATAQUE!', '¡BLASTERS FIJOS! ¡TODO EL ANILLO ES TUYO!'] }, 3, 0);
+  say('lockin', { en: ['LOCK BLASTERS IN ATTACK POSITION!', 'BLASTERS LOCKED! THE WHOLE RING IS YOURS!', 'NOW THIS IS WHERE IT GETS FUN.'],
+                  es: ['¡BLASTERS EN POSICION DE ATAQUE!', '¡BLASTERS FIJOS! ¡TODO EL ANILLO ES TUYO!', 'AHORA SI SE PONE DIVERTIDO.'] }, 3, 0);
 }
 
 function updateLockIn(dt) {
@@ -2143,7 +2143,7 @@ function damageShip(amount) {
   shipHitWobble = 1;
   killStreak = 0;
   shipCallout('-' + amount + ' HULL', '#ff4455');
-  if (hull > 0) say('hit', ["WE'RE HIT!", 'HULL BREACH!', 'TAKING DAMAGE!', 'OUCH. STAY FOCUSED!'], 1, 6);
+  if (hull > 0) say('hit', ["WE'RE HIT!", 'HULL BREACH!', 'TAKING DAMAGE!', 'OUCH. STAY FOCUSED!', "THEY'RE ALL OVER ME!", 'WHERE DID THAT ONE COME FROM?!'], 1, 6);
   updateHullUI();
   playDamage();
   damageFlash = 1;
@@ -3788,7 +3788,7 @@ function startGame(continuing, mode) {
     ? ["YOU'RE ON YOUR OWN OUT HERE, PILOT.", 'NO WAY BACK FROM THE RIFT. GOOD LUCK.']
     : runTier > 0
       ? ['AGAIN, PILOT. THEY KNOW YOU NOW.', 'DEEPER THIS TIME. THEY WILL BE READY.']
-      : ['STAY SHARP, PILOT. HERE THEY COME.', 'ENTERING THE VORTEX. WEAPONS FREE!'], 2, 0);
+      : ['STAY SHARP, PILOT. HERE THEY COME.', 'ENTERING THE VORTEX. WEAPONS FREE!', 'ENGAGE.', 'I HAVE A VERY BAD FEELING ABOUT THIS ONE.'], 2, 0);
   setMusicTrack(gameplayTrack());
 }
 
@@ -3972,12 +3972,20 @@ const COMMS_ES = {
   "SOMETHING BIG ON THE SCOPE! TAKE IT DOWN!": "¡ALGO GRANDE EN EL RADAR! ¡DERRÍBALO!",
   "SPIKES ON THE WALLS! MOVE YOUR AIM!": "¡PÚAS EN LAS PAREDES! ¡MUEVE TU MIRA!",
   "SPIKES! STEER CLEAR OF THEM!": "¡PÚAS! ¡ESQUÍVALAS!",
-  "SWARM DETECTED! HIT SPACE FOR THE ZAPPER!": "¡ENJAMBRE DETECTADO! ¡ESPACIO PARA EL ZAPPER!",
+  "SWARM DETECTED! DROP THE BOMB!": "¡ENJAMBRE DETECTADO! ¡SUELTA LA BOMBA!",
+ "WE PLAY THE HAND WE ARE DEALT. BOMB THEM!": "JUGAMOS CON LAS CARTAS QUE NOS TOCARON. ¡BOMBARDEALOS!",
+ "THEY'RE ALL OVER ME!": "¡LOS TENGO ENCIMA!",
+ "WHERE DID THAT ONE COME FROM?!": "¡¿DE DONDE SALIO ESE?!",
+ "ENGAGE.": "ADELANTE.",
+ "I HAVE A VERY BAD FEELING ABOUT THIS ONE.": "TENGO UN MUY MAL PRESENTIMIENTO DE ESTO.",
+ "EXPRESS LIFT TO THE BOTTOM OF THE VORTEX, GOING DOWN!": "¡ELEVADOR EXPRESS AL FONDO DEL VORTICE, BAJANDO!",
+ "IF IT MOVES, SHOOT IT. IF IT DOESN'T, SHOOT IT ANYWAY.": "SI SE MUEVE, DISPARALE. SI NO, DISPARALE IGUAL.",
+ "IMPOSSIBLE? NO, PILOT. NECESSARY.": "¿IMPOSIBLE? NO, PILOTO. NECESARIO.",
   "TAKE COVER! THEY ARE ON TOP OF YOU!": "¡CÚBRETE! ¡LOS TIENES ENCIMA!",
   "TAKING DAMAGE!": "¡RECIBIENDO DAÑO!",
   "TARGET DOWN. NICE WORK!": "OBJETIVO ABATIDO. ¡BUEN TRABAJO!",
   "THEY CANNOT TOUCH YOU!": "¡NO PUEDEN TOCARTE!",
-  "TOO MANY OF THEM! USE THE ZAPPER!": "¡SON DEMASIADOS! ¡USA EL ZAPPER!",
+  "TOO MANY OF THEM! USE THE BOMB!": "¡SON DEMASIADOS! ¡USA LA BOMBA!",
   "WEAPONS FREE! OPEN FIRE!": "¡ARMAS LIBRES! ¡FUEGO!",
   "WELL DONE! BACK ON COURSE.": "¡BIEN HECHO! DE VUELTA AL CURSO.",
   "WELL DONE, PILOT! PUNCH IT!": "¡BIEN HECHO, PILOTO! ¡A FONDO!",
@@ -4086,7 +4094,7 @@ function commsWatch() {
   }
 
   if (enemies.length >= 6 && zapperCharges > 0) {
-    say('zaphint', ['SWARM DETECTED! HIT SPACE FOR THE ZAPPER!', 'TOO MANY OF THEM! USE THE ZAPPER!'], 2, 25);
+    say('zaphint', ['SWARM DETECTED! DROP THE BOMB!', 'TOO MANY OF THEM! USE THE BOMB!', 'WE PLAY THE HAND WE ARE DEALT. BOMB THEM!'], 2, 25);
   }
   if (enemies.some(e => e.alive && e.z < 0.18)) {
     say('close', ['INCOMING! CLOSE RANGE!', 'TAKE COVER! THEY ARE ON TOP OF YOU!', 'BRACE!'], 1, 14);
@@ -4346,7 +4354,7 @@ function startWarp(banner) {
   triggerShake(8, 0.4);
   inkTimer = INK_TIME;
   spikeWarned = false;
-  say('warp', ['WELL DONE, PILOT! PUNCH IT!', 'BOSS DOWN! HOLD ON, WE ARE JUMPING!', 'OUTSTANDING! WARP NOW!'], 3, 0);
+  say('warp', ['WELL DONE, PILOT! PUNCH IT!', 'BOSS DOWN! HOLD ON, WE ARE JUMPING!', 'OUTSTANDING! WARP NOW!', 'EXPRESS LIFT TO THE BOTTOM OF THE VORTEX, GOING DOWN!'], 3, 0);
 }
 
 function finishWarp() {
@@ -4938,7 +4946,7 @@ function update(dt) {
       if (nextMinibossIndex < MINIBOSS_THRESHOLDS.length && missionProgress() >= MINIBOSS_THRESHOLDS[nextMinibossIndex]) {
         nextMinibossIndex += 1;
         showLevelBanner('INCOMING');
-        say('mini', ['HOSTILE INTERCEPTOR! LIGHT IT UP!', 'SOMETHING BIG ON THE SCOPE! TAKE IT DOWN!'], 2, 0);
+        say('mini', ['HOSTILE INTERCEPTOR! LIGHT IT UP!', 'SOMETHING BIG ON THE SCOPE! TAKE IT DOWN!', "IF IT MOVES, SHOOT IT. IF IT DOESN'T, SHOOT IT ANYWAY."], 2, 0);
         spawnBoss('mini');
       } else if (gameMode === 'rift' && killCount >= RIFT_SECTOR_KILLS) {
         if (riftDepth % RIFT_BOSS_EVERY === 0) {
@@ -4959,7 +4967,7 @@ function update(dt) {
         showLevelBanner(currentLevel < LEVEL_COUNT ? 'WARNING' : 'FINAL WARNING');
         say('boss', currentLevel < LEVEL_COUNT
           ? ['BIG SIGNAL INBOUND! TAKE COVER!', 'BOSS ON THE SCOPE! WATCH ITS VOLLEYS!']
-          : ['THIS IS IT, PILOT! EVERYTHING YOU HAVE!', 'THE HEART OF THE VORTEX! END THIS!'], 3, 0);
+          : ['THIS IS IT, PILOT! EVERYTHING YOU HAVE!', 'THE HEART OF THE VORTEX! END THIS!', 'IMPOSSIBLE? NO, PILOT. NECESSARY.'], 3, 0);
         spawnBoss(currentLevel < LEVEL_COUNT ? 'level' : 'final');
       }
     }
