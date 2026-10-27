@@ -298,6 +298,13 @@ pad (×0.5/×0.6), psychedelic `hoop` (a random pickup + `tripTimer`, a
 hue-rotate CSS filter on the canvas) and `portal` (teleports the ship to
 the mirror lane, or straight across the ring during lock-in).
 
+**Warship bosses** — `drawBoss()` draws bosses head-on as ships:
+`drawGunship()` (miniboss), `drawDreadnought()` (level boss) and
+`drawMothership()` (final boss); the level-2 Watchdog keeps its own shape.
+A locked boss gets corner brackets (`drawLockBrackets()`) instead of a
+bullseye over it. Weavers are alien jellyfish (`squid` shape), so nothing
+hostile resembles the player's interceptors.
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups

@@ -3192,7 +3192,7 @@ function spawnEnemy(angleOverride, typeOverride) {
   const type = typeOverride || pickEnemyType();
   const angle = angleOverride !== undefined ? angleOverride : rng('enemy') * Math.PI * 2;
   const droneShapes = ['tri', 'hex', 'ring'];
-  const shape = type === 'shooter' ? 'square' : type === 'weaver' ? 'chevron'
+  const shape = type === 'shooter' ? 'square' : type === 'weaver' ? 'squid'
     : type === 'pentagram' ? 'pentagram'
     : droneShapes[Math.floor(rng('enemy') * droneShapes.length)];
   // shooters hang back and fire instead; pentagrams are slow, deliberate, unstoppable-feeling
@@ -4590,7 +4590,7 @@ function drawEnemies() {
     // shooters hold still and aim, grid marchers stay flat and upright like
     // the classics, pentagrams turn slow and deliberate like they're not in
     // any hurry, everyone else tumbles
-    const spin = e.type === 'shooter' ? e.angle : e.type === 'grid' ? 0
+    const spin = e.type === 'shooter' ? e.angle : e.type === 'grid' || e.type === 'weaver' ? 0
       : e.type === 'pentagram' ? t * 0.4 + e.angle
       : t * 1.5 + e.angle;
     ctx.save();
@@ -4632,13 +4632,21 @@ function drawEnemies() {
         if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
       });
       ctx.closePath();
-    } else if (e.shape === 'chevron') {
-      // arrow-like fighter silhouette for the weaving enemy
-      ctx.moveTo(0, -size * 1.2);
-      ctx.lineTo(size * 0.7, size * 0.7);
-      ctx.lineTo(0, size * 0.15);
-      ctx.lineTo(-size * 0.7, size * 0.7);
+    } else if (e.shape === 'squid') {
+      // the weaver: an alien jellyfish (a dome with trailing tentacles), so
+      // nothing hostile reads as one of the player's own interceptors
+      ctx.arc(0, 0, size * 0.85, Math.PI, 0);
+      ctx.lineTo(size * 0.85, size * 0.15);
+      ctx.lineTo(-size * 0.85, size * 0.15);
       ctx.closePath();
+      for (let k = -2; k <= 2; k++) {
+        const x0 = k * size * 0.36;
+        ctx.moveTo(x0, size * 0.15);
+        for (let j = 1; j <= 3; j++) {
+          const wig = Math.sin(t * 6 + k + j) * size * 0.16;
+          ctx.lineTo(x0 + wig, size * (0.15 + j * 0.33));
+        }
+      }
     } else if (e.shape === 'pentagram') {
       // inverted five-pointed star — something hellish riding the current in
       const outerR = size * 1.15, innerR = size * 0.44;
@@ -4749,6 +4757,110 @@ function drawWatchdog(pt, size) {
   ctx.restore();
 }
 
+// Bosses are warships seen head-on as they come down the tunnel: a twin-
+// boom gunship (miniboss), a dreadnought (level boss) and a mothership
+// (final boss). Coordinates are in units of S, +y down.
+function bossLine(pts, close) {
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  if (close) ctx.closePath();
+  ctx.stroke();
+}
+
+function drawGunship(S) {
+  const u = (pts) => pts.map(([x, y]) => [x * S, y * S]);
+  bossLine(u([[-1.2, -0.5], [-0.8, -0.5], [-0.8, 0.7], [-1.2, 0.7]]), true);  // left boom
+  bossLine(u([[0.8, -0.5], [1.2, -0.5], [1.2, 0.7], [0.8, 0.7]]), true);      // right boom
+  bossLine(u([[-0.8, 0.05], [0.8, 0.05]]));                                  // wing spar
+  bossLine(u([[-0.35, -0.35], [0.35, -0.35], [0.5, 0.3], [0, 0.55], [-0.5, 0.3]]), true); // pod
+  ctx.fillStyle = '#ffd23f';
+  ctx.shadowColor = '#ffd23f';
+  ctx.fillRect(-0.2 * S, -0.22 * S, 0.4 * S, 0.12 * S); // lit cockpit
+  for (const x of [-1, 1]) {                                                 // guns
+    bossLine(u([[x, -0.5], [x, -0.95]]));
+  }
+}
+
+function drawDreadnought(S) {
+  const u = (pts) => pts.map(([x, y]) => [x * S, y * S]);
+  // wedge hull
+  bossLine(u([[-1.45, 0.1], [-0.9, -0.35], [-0.3, -0.5], [0, -0.62], [0.3, -0.5], [0.9, -0.35],
+              [1.45, 0.1], [0.9, 0.45], [0.3, 0.56], [-0.3, 0.56], [-0.9, 0.45]]), true);
+  // bridge tower with a window slit
+  bossLine(u([[-0.2, -0.55], [-0.2, -1.0], [0.2, -1.0], [0.2, -0.55]]));
+  ctx.save();
+  ctx.lineWidth = 1.2;
+  ctx.globalAlpha = 0.6;
+  bossLine(u([[-0.12, -0.86], [0.12, -0.86]]));
+  // hull panel lines
+  bossLine(u([[-1.45, 0.1], [1.45, 0.1]]));
+  bossLine(u([[-0.9, -0.35], [-0.9, 0.45]]));
+  bossLine(u([[0.9, -0.35], [0.9, 0.45]]));
+  bossLine(u([[-0.3, -0.5], [-0.3, 0.56]]));
+  bossLine(u([[0.3, -0.5], [0.3, 0.56]]));
+  ctx.restore();
+  // turrets
+  for (const [x, y] of [[-0.6, -0.12], [0.6, -0.12], [0, 0.3]]) {
+    ctx.beginPath();
+    ctx.arc(x * S, y * S, 0.1 * S, 0, Math.PI * 2);
+    ctx.stroke();
+    bossLine(u([[x, y], [x + 0.05, y - 0.28]]));
+  }
+  // glowing engines
+  ctx.fillStyle = `rgba(255,170,60,${0.6 + Math.sin(t * 9) * 0.25})`;
+  ctx.shadowColor = '#ffaa3c';
+  for (const x of [-1.15, 1.15]) {
+    ctx.beginPath();
+    ctx.arc(x * S, 0.28 * S, 0.16 * S, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // blinking running lights at the wing tips
+  if (Math.sin(t * 5) > 0) {
+    ctx.fillStyle = '#ff2a2a';
+    for (const x of [-1.45, 1.45]) ctx.fillRect(x * S - 3, 0.1 * S - 3, 6, 6);
+  }
+}
+
+function drawMothership(S) {
+  // a huge saucer with a rotating crown of spikes and a glowing reactor eye
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 1.6 * S, 0.55 * S, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(0, -0.1 * S, 0.9 * S, 0.3 * S, 0, Math.PI, Math.PI * 2);
+  ctx.stroke();
+  ctx.save();
+  ctx.lineWidth = 1.2;
+  ctx.globalAlpha = 0.55;
+  for (let k = 0; k < 16; k++) {
+    const a = (k / 16) * Math.PI * 2 + t * 0.4;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 0.95 * S, Math.sin(a) * 0.33 * S);
+    ctx.lineTo(Math.cos(a) * 1.6 * S, Math.sin(a) * 0.55 * S);
+    ctx.stroke();
+  }
+  ctx.restore();
+  for (let k = 0; k < 10; k++) {
+    const a = (k / 10) * Math.PI * 2 + t * 0.4;
+    const x = Math.cos(a) * 1.6 * S, y = Math.sin(a) * 0.55 * S;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x * 1.18, y * 1.18 - 0.08 * S);
+    ctx.stroke();
+  }
+  const pulse = 0.6 + Math.sin(t * 6) * 0.3;
+  ctx.fillStyle = `rgba(255,60,40,${pulse})`;
+  ctx.shadowColor = '#ff3c28';
+  ctx.shadowBlur = 40;
+  ctx.beginPath();
+  ctx.arc(0, 0.05 * S, 0.28 * S, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(0, 0.05 * S, 0.09 * S, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 function drawBoss() {
   if (!boss || !boss.alive) return;
   const pt = pointOnRing(boss.angle, boss.z);
@@ -4756,32 +4868,14 @@ function drawBoss() {
   if (boss.form === 'watchdog') { drawWatchdog(pt, size); return; }
   ctx.save();
   ctx.translate(pt.x, pt.y);
-  ctx.rotate(t * 0.3);
+  ctx.rotate(Math.sin(t * 0.8) * 0.08); // a heavy, slow bank
   ctx.strokeStyle = '#ff5533';
   ctx.shadowColor = '#ff5533';
-  ctx.shadowBlur = 24 + Math.sin(t * 4) * 6;
-  ctx.lineWidth = 3;
-  // large faceted hull, same gem-cut language as the player ship but bigger and hostile
-  const pts = [];
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    const r = size * (i % 2 === 0 ? 1 : 0.72);
-    pts.push([Math.cos(a) * r, Math.sin(a) * r]);
-  }
-  ctx.beginPath();
-  pts.forEach((p, i) => i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]));
-  ctx.closePath();
-  ctx.stroke();
-  // inner facet lines
-  ctx.lineWidth = 1.2;
-  ctx.globalAlpha = 0.6;
-  for (let i = 0; i < pts.length; i += 2) {
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(pts[i][0], pts[i][1]);
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 20 + Math.sin(t * 4) * 6;
+  ctx.lineWidth = 2.5;
+  if (boss.kind === 'mini') drawGunship(size * 0.9);
+  else if (boss.kind === 'final') drawMothership(size * 0.95);
+  else drawDreadnought(size);
   ctx.restore();
 }
 
@@ -5416,6 +5510,30 @@ function findAimTarget() {
   return best;
 }
 
+function drawLockBrackets(x, y, r) {
+  const k = r * 0.35;
+  const pulse = 1 + Math.sin(t * 10) * 0.05;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(pulse, pulse);
+  ctx.strokeStyle = '#fff27a';
+  ctx.shadowColor = '#ffe14d';
+  ctx.shadowBlur = 14;
+  ctx.lineWidth = 3;
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    ctx.beginPath();
+    ctx.moveTo(sx * r, sy * r + -sy * k);
+    ctx.lineTo(sx * r, sy * r);
+    ctx.lineTo(sx * r + -sx * k, sy * r);
+    ctx.stroke();
+  }
+  ctx.font = "9px 'Press Start 2P', 'Courier New', monospace";
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ff3355';
+  ctx.fillText('LOCK', 0, -r - 8);
+  ctx.restore();
+}
+
 function drawBullseye(x, y, r, locked, color) {
   // yellow bullseye; a lock turns it white-hot with a red centre and ticks
   // (co-op gunners pass their own colour)
@@ -5481,9 +5599,13 @@ function drawAimLine() {
     ctx.fillRect(pt.x - d / 2, pt.y - d / 2, d, d);
   }
   const target = findAimTarget();
-  if (target) {
+  if (target && target === boss) {
+    // bosses get corner brackets framing the whole ship, not a bullseye over it
+    const pt = pointOnRing(boss.angle, boss.z);
+    drawLockBrackets(pt.x, pt.y, Math.max(16, 50 * (1 - boss.z) + 14) * 1.7);
+  } else if (target) {
     const pt = pointOnRing(target.angle, target.z);
-    const size = Math.max(10, (target === boss ? 50 : 26) * (1 - target.z) + 8);
+    const size = Math.max(10, 26 * (1 - target.z) + 8);
     drawBullseye(pt.x, pt.y, size, true);
   } else {
     const pt = pointOnRing(aimAngle, 0.45);
