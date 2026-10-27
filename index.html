@@ -362,6 +362,12 @@
     text-shadow: none;
     box-shadow: 0 0 14px #3c8aff;
   }
+  #shippreview {
+    display: block;
+    margin: 10px auto 0;
+    width: 200px;
+    height: 110px;
+  }
   #shipclassdesc {
     font-size: 8px !important;
     letter-spacing: 1px;
@@ -546,6 +552,7 @@
     <button data-class="2">TANK</button>
     <button data-class="3">GUNNER</button>
   </div>
+  <canvas id="shippreview" width="200" height="110"></canvas>
   <p id="shipclassdesc"></p>
   <div id="shipcolor">
     <span class="scLabel">COLOR</span>
@@ -1347,6 +1354,23 @@ let shieldTimer = 0;      // seconds of full damage immunity left (shield pickup
 let overdriveTimer = 0;   // seconds of automatic rapid fire left (overdrive pickup)
 let autoFireTimer = 0;    // countdown to overdrive's next automatic shot
 let novaFlash = 0;        // 1..0, the screen-clearing nova shockwave animation
+
+// Echo pickup (Gradius-style options): for ECHO_DURATION, every shot is
+// repeated by two ghost ships ECHO_DELAYS later, down the same lane, so
+// fire "reverberates" and catches whatever drifts into the lane after it.
+const ECHO_DURATION = 10;
+const ECHO_DELAYS = [0.2, 0.4];
+let echoTimer = 0;
+let echoQueue = [];       // { at, angle } shots waiting to be replayed
+let echoTrail = [];       // { t, x, lean } recent ship positions for the ghosts
+
+// where the ship was at time `when` (nearest recorded sample)
+function echoSample(when) {
+  for (let i = echoTrail.length - 1; i >= 0; i--) {
+    if (echoTrail[i].t <= when) return echoTrail[i];
+  }
+  return echoTrail[0] || { x: shipX, lean: 0 };
+}
 let pointerHeld = false;  // mouse button / finger down (interceptor hold-to-fire)
 let holdFireTimer = 0;
 
@@ -1459,12 +1483,14 @@ canvas.addEventListener('touchmove', (e) => {
 
 function fire() {
   if (state !== 'playing') return;
-  if (tripleLaserTimer > 0) {
-    for (const off of [-0.16, 0, 0.16]) {
-      bolts.push({ angle: normalizeAngle(aimAngle + off), z: 0.04 });
+  const angles = tripleLaserTimer > 0
+    ? [-0.16, 0, 0.16].map(off => normalizeAngle(aimAngle + off))
+    : [aimAngle];
+  for (const angle of angles) bolts.push({ angle, z: 0.04 });
+  if (echoTimer > 0) {
+    for (const delay of ECHO_DELAYS) {
+      for (const angle of angles) echoQueue.push({ at: t + delay, angle });
     }
-  } else {
-    bolts.push({ angle: aimAngle, z: 0.04 });
   }
   pulses.push({ startTime: t, angle: aimAngle });
   shipRecoil = 1;
@@ -1734,6 +1760,9 @@ function startGame(continuing, mode) {
   shipVX = 0;
   shipRecoil = 0;
   shipHitWobble = 0;
+  echoTimer = 0;
+  echoQueue = [];
+  echoTrail = [];
   warpTimer = 0;
   spikes = [];
   pointerHeld = false;
@@ -1942,6 +1971,8 @@ const COMMS_ES = {
   "GUNS HOT! FULL AUTO!": "¡CAÑONES CALIENTES! ¡AUTOMÁTICO!",
   "BOOM. SCREEN CLEAR.": "BUM. PANTALLA LIMPIA.",
   "NOVA! THAT CLEARED THE AIR.": "¡NOVA! ESO DESPEJÓ EL AIRE.",
+  "ECHO ONLINE! YOUR SHOTS HAVE GHOSTS!": "¡ECO EN LÍNEA! ¡TUS DISPAROS TIENEN FANTASMAS!",
+  "ECHO! EVERY SHOT TWICE MORE!": "¡ECO! ¡CADA DISPARO, DOS VECES MÁS!",
   "YOU'RE ON YOUR OWN OUT HERE, PILOT.": "AQUÍ ESTÁS SOLO, PILOTO.",
   "NO WAY BACK FROM THE RIFT. GOOD LUCK.": "NO HAY REGRESO DE LA GRIETA. SUERTE.",
   "AGAIN, PILOT. THEY KNOW YOU NOW.": "OTRA VEZ, PILOTO. YA TE CONOCEN.",
@@ -2104,10 +2135,11 @@ function spawnPowerup() {
   // hull repair is still the most common; the star is a Mario-style power
   // moment; shield, overdrive and the screen-clearing nova are the rarer extras
   const roll = Math.random();
-  const kind = roll < 0.45 ? 'hull'
-    : roll < 0.63 ? 'star'
-    : roll < 0.78 ? 'shield'
-    : roll < 0.91 ? 'overdrive'
+  const kind = roll < 0.42 ? 'hull'
+    : roll < 0.58 ? 'star'
+    : roll < 0.72 ? 'shield'
+    : roll < 0.84 ? 'overdrive'
+    : roll < 0.93 ? 'echo'
     : 'nova';
   powerups.push({ angle, z: 1.0, alive: true, kind });
 }
@@ -2120,14 +2152,19 @@ function collectPowerup(p) {
     star: ['TRIPLE LASER!', '#fff6c8', ["TRIPLE LASER! SPREAD 'EM OUT!", 'FIREPOWER TRIPLED!']],
     shield: ['SHIELD UP!', '#50e6ff', ['SHIELDS UP. GO LOUD!', "YOU'RE COVERED. PUSH IN!"]],
     overdrive: ['OVERDRIVE!', '#ff8c28', ["OVERDRIVE! LET 'EM HAVE IT!", 'GUNS HOT! FULL AUTO!']],
-    nova: ['NOVA!', '#ff78ff', ['BOOM. SCREEN CLEAR.', 'NOVA! THAT CLEARED THE AIR.']]
+    nova: ['NOVA!', '#ff78ff', ['BOOM. SCREEN CLEAR.', 'NOVA! THAT CLEARED THE AIR.']],
+    echo: ['ECHO!', '#b4ff5a', ['ECHO ONLINE! YOUR SHOTS HAVE GHOSTS!', 'ECHO! EVERY SHOT TWICE MORE!']]
   };
   const callout = pickupCallouts[p.kind];
   if (callout) {
     shipCallout(callout[0], callout[1]);
     say('pickup-' + p.kind, callout[2], 1, 10);
   }
-  if (p.kind === 'shield') {
+  if (p.kind === 'echo') {
+    echoTimer = ECHO_DURATION;
+    updateTripleUI();
+    burst(p.angle, p.z, { color: '180,255,90', bitColor: '#b4ff5a', label: 'ECHO!', labelColor: '#e2ffb8' });
+  } else if (p.kind === 'shield') {
     shieldTimer = SHIELD_DURATION;
     updateTripleUI();
     burst(p.angle, p.z, { color: '80,230,255', bitColor: '#50e6ff', label: 'SHIELD!', labelColor: '#b8f6ff' });
@@ -2166,6 +2203,7 @@ function updateTripleUI() {
   if (tripleLaserTimer > 0) lines.push('TRIPLE LASER ' + tripleLaserTimer.toFixed(1) + 's');
   if (shieldTimer > 0) lines.push('SHIELD ' + shieldTimer.toFixed(1) + 's');
   if (overdriveTimer > 0) lines.push('OVERDRIVE ' + overdriveTimer.toFixed(1) + 's');
+  if (echoTimer > 0) lines.push('ECHO ' + echoTimer.toFixed(1) + 's');
   el.textContent = lines.join('\n');
   el.style.display = lines.length ? 'block' : 'none';
 }
@@ -2337,6 +2375,17 @@ function update(dt) {
     }
     novaFlash = Math.max(0, novaFlash - dt * 1.6);
     commsWatch();
+
+    // echo: remember the ship's path for the ghosts, replay queued shots
+    echoTrail.push({ t, x: shipX, lean: Math.max(-0.35, Math.min(0.35, Math.sin(aimAngle) * 0.18 + shipVX * 0.0011)) });
+    while (echoTrail.length && echoTrail[0].t < t - 1) echoTrail.shift();
+    if (echoTimer > 0) {
+      echoTimer = Math.max(0, echoTimer - dt);
+      updateTripleUI();
+    }
+    while (echoQueue.length && echoQueue[0].at <= t) {
+      bolts.push({ angle: echoQueue.shift().angle, z: 0.04, echo: true });
+    }
 
     if (briefingTimer > 0) {
       briefingTimer -= dt;
@@ -2710,6 +2759,7 @@ function draw() {
     drawBitBursts();
     drawHitLabels();
     drawAimLine();
+    drawEchoGhosts();
     drawShip();
     ctx.restore();
     if (state === 'playing') drawRadar();
@@ -3054,7 +3104,21 @@ function drawPowerups() {
     const size = Math.max(4, 17 * (1 - p.z) + 5);
     ctx.save();
     ctx.translate(pt.x, pt.y);
-    if (p.kind === 'shield') {
+    if (p.kind === 'echo') {
+      // lime ripples: three rings drifting apart and back, like a reverb
+      ctx.strokeStyle = '#b4ff5a';
+      ctx.shadowColor = '#b4ff5a';
+      ctx.shadowBlur = 16;
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 3; i++) {
+        const off = Math.sin(t * 4 + i) * size * 0.25;
+        ctx.beginPath();
+        ctx.arc(off * (i - 1), 0, size * (0.45 + i * 0.25), 0, Math.PI * 2);
+        ctx.globalAlpha = 1 - i * 0.28;
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    } else if (p.kind === 'shield') {
       // cyan hexagon with an inner ring: reads as a force field
       ctx.rotate(t * 1.2);
       ctx.strokeStyle = '#50e6ff';
@@ -3147,162 +3211,234 @@ function drawPowerups() {
   }
 }
 
-function drawShip() {
-  // a blocky, low-poly faceted hull (gem-like, not a dart): wide body with
-  // visible internal facet lines, short stub fins ending in thruster pods
-  const s = Math.min(W, H) * 0.095 * shipClass().scale;
-  // slides along the bottom with the aim, bobs gently, kicks back on each
-  // shot and shudders when hit
-  const sx = CX + shipX + Math.sin(t * 40) * 6 * shipHitWobble;
-  const sy = H - Math.min(W, H) * 0.11 + Math.sin(t * 2.6) * s * 0.06 + shipRecoil * s * 0.12;
-  // banks into the slide (from velocity) on top of leaning toward the aim
-  const lean = Math.max(-0.35, Math.min(0.35,
-    Math.sin(aimAngle) * 0.18 + shipVX * 0.0011 + Math.sin(t * 33) * 0.08 * shipHitWobble));
-
-  ctx.save();
-  ctx.translate(sx, sy);
-  ctx.rotate(lean);
-  ctx.scale(1, 0.82); // looking slightly down onto the hull
-
-  // thruster flames: flicker constantly, flare on recoil and under overdrive
-  {
-    const pal0 = SHIP_PALETTES[shipPaletteIndex];
-    const flare = 1 + shipRecoil * 0.8 + (overdriveTimer > 0 ? 0.6 : 0);
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (const side of [1, -1]) {
-      const len = (0.35 + Math.random() * 0.25) * flare;
-      const x0 = side * 1.12, x1 = side * 1.43, xm = side * 1.275;
-      ctx.beginPath();
-      ctx.moveTo(x0 * s, 0.3 * s);
-      ctx.lineTo(xm * s, (0.3 + len) * s);
-      ctx.lineTo(x1 * s, 0.3 * s);
-      ctx.strokeStyle = overdriveTimer > 0 ? 'rgba(255,150,60,0.9)' : hexToRgba(pal0.glow, 0.85);
-      ctx.shadowColor = overdriveTimer > 0 ? '#ff8c28' : pal0.glow;
-      ctx.shadowBlur = 14;
-      ctx.lineWidth = 1.6;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo((x0 + side * 0.08) * s, 0.3 * s);
-      ctx.lineTo(xm * s, (0.3 + len * 0.55) * s);
-      ctx.lineTo((x1 - side * 0.08) * s, 0.3 * s);
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-    ctx.restore();
+// Per-class silhouettes, in hull units (multiplied by the ship size s).
+// hull: outline polygon; facets: faint cut lines; struts: brighter fins or
+// barrels; pods: [x0, y0, x1, y1] grilled boxes; engines: [x, y, halfWidth]
+// flame mouths; cores: white engine glows; knotY: where the valknut sits.
+const SHIP_SHAPES = [
+  { // VIPER: the original blocky gem-cut hull with stub fins and pods
+    hull: [[0, -0.95], [0.55, -0.5], [0.78, 0.05], [0.42, 0.6], [0, 0.82], [-0.42, 0.6], [-0.78, 0.05], [-0.55, -0.5]],
+    facets: [[[0, -0.95], [0.78, 0.05]], [[0, -0.95], [-0.78, 0.05]], [[0, 0.82], [0.78, 0.05]], [[0, 0.82], [-0.78, 0.05]],
+             [[-0.78, 0.05], [0.78, 0.05]], [[0.55, -0.5], [0.42, 0.6]], [[-0.55, -0.5], [-0.42, 0.6]]],
+    struts: [[[0.78, 0.05], [1.25, 0.12]], [[-0.78, 0.05], [-1.25, 0.12]]],
+    pods: [[1.05, -0.08, 1.5, 0.3], [-1.5, -0.08, -1.05, 0.3]],
+    engines: [[1.275, 0.3, 0.155], [-1.275, 0.3, 0.155]],
+    cores: [[1.5, 0.11], [-1.5, 0.11]],
+    knotY: -0.15
+  },
+  { // INTERCEPTOR: a long, narrow dart with swept-back wings and one engine
+    hull: [[0, -1.3], [0.2, -0.55], [0.3, 0.05], [1.2, 0.6], [1.0, 0.7], [0.28, 0.48], [0.14, 0.78], [-0.14, 0.78],
+           [-0.28, 0.48], [-1.0, 0.7], [-1.2, 0.6], [-0.3, 0.05], [-0.2, -0.55]],
+    facets: [[[0, -1.3], [0, 0.78]], [[0.3, 0.05], [1.0, 0.7]], [[-0.3, 0.05], [-1.0, 0.7]], [[-0.2, -0.55], [0.2, -0.55]]],
+    struts: [[[1.2, 0.6], [1.2, 0.05]], [[-1.2, 0.6], [-1.2, 0.05]]],
+    pods: [],
+    engines: [[0, 0.78, 0.14]],
+    cores: [[1.2, 0.05], [-1.2, 0.05]],
+    knotY: -0.25
+  },
+  { // TANK: a wide armoured slab with heavy tread pods and a turret barrel
+    hull: [[-0.7, -0.72], [0.7, -0.72], [1.02, -0.35], [1.02, 0.55], [0.7, 0.82], [-0.7, 0.82], [-1.02, 0.55], [-1.02, -0.35]],
+    facets: [[[-1.02, -0.05], [1.02, -0.05]], [[-1.02, 0.3], [1.02, 0.3]], [[-0.7, -0.72], [-0.7, 0.82]], [[0.7, -0.72], [0.7, 0.82]]],
+    struts: [[[0, -0.45], [0, -1.2]], [[0.08, -0.45], [0.08, -1.12]], [[-0.08, -0.45], [-0.08, -1.12]]],
+    pods: [[1.08, -0.55, 1.55, 0.7], [-1.55, -0.55, -1.08, 0.7]],
+    engines: [[1.315, 0.7, 0.17], [-1.315, 0.7, 0.17]],
+    cores: [[1.315, 0.62], [-1.315, 0.62]],
+    knotY: 0.12,
+    turret: 0.32
+  },
+  { // GUNNER: broad delta wings and a three-barrel cannon up front
+    hull: [[0, -0.72], [0.55, -0.45], [1.35, 0.28], [0.62, 0.42], [0, 0.78], [-0.62, 0.42], [-1.35, 0.28], [-0.55, -0.45]],
+    facets: [[[0, -0.72], [0, 0.78]], [[0.55, -0.45], [0.62, 0.42]], [[-0.55, -0.45], [-0.62, 0.42]]],
+    struts: [[[0, -0.72], [0, -1.32]], [[0.32, -0.56], [0.32, -1.12]], [[-0.32, -0.56], [-0.32, -1.12]]],
+    pods: [[1.25, 0.1, 1.6, 0.4], [-1.6, 0.1, -1.25, 0.4]],
+    engines: [[0.42, 0.55, 0.13], [-0.42, 0.55, 0.13]],
+    cores: [[1.6, 0.25], [-1.6, 0.25]],
+    knotY: 0.05
   }
+];
+
+// Draws a ship. With no options: the player's ship at its live position
+// (sliding, bobbing, recoil, hit wobble, shield). Options draw elsewhere:
+// { g: canvas context, x, y, s: size, lean, alpha, classIndex, ghost, palette }.
+function drawShip(opts) {
+  opts = opts || {};
+  const g = opts.g || ctx;
+  const cls = opts.classIndex !== undefined ? opts.classIndex : shipClassIndex;
+  const shape = SHIP_SHAPES[cls];
+  const live = !opts.g && !opts.ghost;
+  const s = opts.s || Math.min(W, H) * 0.095 * SHIP_CLASSES[cls].scale;
+  let sx, sy, lean;
+  if (opts.x !== undefined) {
+    sx = opts.x; sy = opts.y; lean = opts.lean || 0;
+  } else {
+    // slides along the bottom with the aim, bobs gently, kicks back on each
+    // shot and shudders when hit
+    sx = CX + shipX + Math.sin(t * 40) * 6 * shipHitWobble;
+    sy = H - Math.min(W, H) * 0.11 + Math.sin(t * 2.6) * s * 0.06 + shipRecoil * s * 0.12;
+    // banks into the slide (from velocity) on top of leaning toward the aim
+    lean = Math.max(-0.35, Math.min(0.35,
+      Math.sin(aimAngle) * 0.18 + shipVX * 0.0011 + Math.sin(t * 33) * 0.08 * shipHitWobble));
+  }
+  const pal = opts.palette || SHIP_PALETTES[shipPaletteIndex];
+
+  g.save();
+  g.globalAlpha = opts.alpha !== undefined ? opts.alpha : 1;
+  g.translate(sx, sy);
+  g.rotate(lean);
+  g.scale(1, 0.82); // looking slightly down onto the hull
 
   const P = (x, y) => [x * s, y * s];
-  function strokeShape(pts, close) {
-    ctx.beginPath();
+  const strokeShape = (pts, close) => {
+    g.beginPath();
     pts.forEach((pt, i) => {
       const [x, y] = P(pt[0], pt[1]);
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
     });
-    if (close) ctx.closePath();
-    ctx.stroke();
+    if (close) g.closePath();
+    g.stroke();
+  };
+  const strokeLine = (a, b) => {
+    g.beginPath();
+    g.moveTo(...P(a[0], a[1]));
+    g.lineTo(...P(b[0], b[1]));
+    g.stroke();
+  };
+
+  // thruster flames: flicker constantly, flare on recoil and under overdrive
+  const hot = live && overdriveTimer > 0;
+  const flare = 1 + (live ? shipRecoil * 0.8 : 0) + (hot ? 0.6 : 0);
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  for (const [ex, ey, ew] of shape.engines) {
+    const len = (0.35 + Math.random() * 0.25) * flare;
+    g.beginPath();
+    g.moveTo((ex - ew) * s, ey * s);
+    g.lineTo(ex * s, (ey + len) * s);
+    g.lineTo((ex + ew) * s, ey * s);
+    g.strokeStyle = hot ? 'rgba(255,150,60,0.9)' : hexToRgba(pal.glow, 0.85);
+    g.shadowColor = hot ? '#ff8c28' : pal.glow;
+    g.shadowBlur = 14;
+    g.lineWidth = 1.6;
+    g.stroke();
+    g.beginPath();
+    g.moveTo((ex - ew * 0.5) * s, ey * s);
+    g.lineTo(ex * s, (ey + len * 0.55) * s);
+    g.lineTo((ex + ew * 0.5) * s, ey * s);
+    g.strokeStyle = 'rgba(255,255,255,0.9)';
+    g.lineWidth = 1;
+    g.stroke();
   }
-  function strokeLine(a, b) {
-    ctx.beginPath();
-    ctx.moveTo(...P(a[0], a[1]));
-    ctx.lineTo(...P(b[0], b[1]));
-    ctx.stroke();
+  g.restore();
+
+  // hull outline
+  g.strokeStyle = pal.main;
+  g.shadowColor = pal.glow;
+  g.shadowBlur = 16;
+  g.lineWidth = 2.2;
+  strokeShape(shape.hull, true);
+  if (shape.turret) {
+    g.beginPath();
+    g.arc(0, -0.2 * s, shape.turret * s, 0, Math.PI * 2);
+    g.stroke();
   }
 
-  // blocky gem-cut hull: wide octagonal silhouette, not a tapered dart
-  const top = [0, -0.95], shR = [0.55, -0.5], midR = [0.78, 0.05],
-        loR = [0.42, 0.6], bot = [0, 0.82], loL = [-0.42, 0.6],
-        midL = [-0.78, 0.05], shL = [-0.55, -0.5];
+  // internal facet lines
+  g.lineWidth = 1;
+  g.shadowBlur = 6;
+  g.strokeStyle = hexToRgba(pal.main, 0.5);
+  for (const [a, b] of shape.facets) strokeLine(a, b);
 
-  // ship accent color is player-chosen on the title screen (SHIP_PALETTES)
-  const pal = SHIP_PALETTES[shipPaletteIndex];
+  // fins / barrels
+  g.strokeStyle = hexToRgba(pal.main, 0.85);
+  g.shadowColor = pal.glow;
+  g.shadowBlur = 10;
+  g.lineWidth = 1.8;
+  for (const [a, b] of shape.struts) strokeLine(a, b);
 
-  ctx.strokeStyle = pal.main;
-  ctx.shadowColor = pal.glow;
-  ctx.shadowBlur = 16;
-  ctx.lineWidth = 2.2;
-  strokeShape([top, shR, midR, loR, bot, loL, midL, shL], true);
-
-  // internal facet lines, low-poly cut lines across the hull
-  ctx.lineWidth = 1;
-  ctx.shadowBlur = 6;
-  ctx.strokeStyle = hexToRgba(pal.main, 0.5);
-  strokeLine(top, midR);
-  strokeLine(top, midL);
-  strokeLine(bot, midR);
-  strokeLine(bot, midL);
-  strokeLine(midL, midR);
-  strokeLine(shR, loR);
-  strokeLine(shL, loL);
-
-  // short stub fins from the hull's waist, ending in small thruster pods
-  ctx.strokeStyle = hexToRgba(pal.main, 0.8);
-  ctx.shadowColor = pal.glow;
-  ctx.shadowBlur = 10;
-  ctx.lineWidth = 1.6;
-  strokeLine(midR, [1.25, 0.12]);
-  strokeLine(midL, [-1.25, 0.12]);
-  // pods (small rectangles with grille stripes, like the reference ships)
-  for (const side of [1, -1]) {
-    const x0 = side * 1.05, x1 = side * 1.5;
-    strokeShape([[x0, -0.08], [x1, -0.08], [x1, 0.3], [x0, 0.3]], true);
-    ctx.lineWidth = 0.8;
-    for (const f of [0.05, 0.15, 0.25]) {
-      strokeLine([x0, -0.08 + f * 0.9], [x1, -0.08 + f * 0.9]);
+  // pods with grille stripes
+  g.lineWidth = 1.6;
+  for (const [x0, y0, x1, y1] of shape.pods) {
+    strokeShape([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], true);
+    g.lineWidth = 0.8;
+    const rows = Math.max(3, Math.round((y1 - y0) / 0.12));
+    for (let r = 1; r < rows; r++) {
+      const y = y0 + (y1 - y0) * r / rows;
+      strokeLine([x0, y], [x1, y]);
     }
-    ctx.lineWidth = 1.6;
-  }
-  // bright engine core glow at the back of each pod
-  ctx.fillStyle = '#fff';
-  ctx.shadowColor = '#fff';
-  ctx.shadowBlur = 10;
-  for (const side of [1, -1]) {
-    const [ex, ey] = P(side * 1.5, 0.11);
-    ctx.beginPath();
-    ctx.arc(ex, ey, 0.04 * s, 0, Math.PI * 2);
-    ctx.fill();
+    g.lineWidth = 1.6;
   }
 
-  // valknut emblem on the forward facet of the hull
-  ctx.strokeStyle = pal.glow;
-  ctx.shadowColor = pal.glow;
-  ctx.shadowBlur = 8;
-  ctx.lineWidth = 1;
-  const knotR = 0.15, knotY = -0.15;
+  // bright engine glows
+  g.fillStyle = '#fff';
+  g.shadowColor = '#fff';
+  g.shadowBlur = 10;
+  for (const [cx0, cy0] of shape.cores) {
+    const [x, y] = P(cx0, cy0);
+    g.beginPath();
+    g.arc(x, y, 0.04 * s, 0, Math.PI * 2);
+    g.fill();
+  }
+
+  // valknut emblem
+  g.strokeStyle = pal.glow;
+  g.shadowColor = pal.glow;
+  g.shadowBlur = 8;
+  g.lineWidth = 1;
+  const knotR = 0.15, knotY = shape.knotY;
   for (let k = 0; k < 3; k++) {
     const rot = (k / 3) * Math.PI * 2;
-    ctx.beginPath();
+    g.beginPath();
     for (let i = 0; i < 3; i++) {
       const a = rot + (i / 3) * Math.PI * 2 - Math.PI / 2;
       const [x, y] = P(Math.cos(a) * knotR, knotY + Math.sin(a) * knotR);
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
     }
-    ctx.closePath();
-    ctx.stroke();
+    g.closePath();
+    g.stroke();
   }
 
   // shield bubble: a pulsing hex cage, flickering in its last second or two
-  if (shieldTimer > 0 && (shieldTimer > 1.5 || Math.sin(t * 30) > 0)) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.rotate(t * 0.8);
+  if (live && shieldTimer > 0 && (shieldTimer > 1.5 || Math.sin(t * 30) > 0)) {
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    g.rotate(t * 0.8);
     const r = s * (1.75 + Math.sin(t * 6) * 0.05);
-    ctx.beginPath();
+    g.beginPath();
     for (let i = 0; i <= 6; i++) {
       const a = (i / 6) * Math.PI * 2;
-      if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
-      else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      if (i === 0) g.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+      else g.lineTo(Math.cos(a) * r, Math.sin(a) * r);
     }
-    ctx.strokeStyle = 'rgba(80,230,255,0.75)';
-    ctx.shadowColor = '#50e6ff';
-    ctx.shadowBlur = 18;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.restore();
+    g.strokeStyle = 'rgba(80,230,255,0.75)';
+    g.shadowColor = '#50e6ff';
+    g.shadowBlur = 18;
+    g.lineWidth = 2;
+    g.stroke();
+    g.restore();
   }
 
-  ctx.restore();
+  g.restore();
+}
+
+// Echo ghosts: two faded copies of the ship riding above it, each replaying
+// where the real ship was ECHO_DELAYS[i] seconds ago.
+function drawEchoGhosts() {
+  if (echoTimer <= 0) return;
+  const base = Math.min(W, H) * 0.095 * shipClass().scale;
+  const sy = H - Math.min(W, H) * 0.11;
+  const fade = echoTimer < 1.5 && Math.sin(t * 30) < 0 ? 0.15 : 1;
+  ECHO_DELAYS.forEach((delay, i) => {
+    const past = echoSample(t - delay);
+    drawShip({
+      ghost: true,
+      x: CX + past.x,
+      y: sy - base * (1.0 + 0.8 * i),
+      s: base * (0.55 - 0.08 * i),
+      lean: past.lean,
+      alpha: (0.75 - 0.15 * i) * fade,
+      palette: { main: '#b4ff5a', glow: '#b4ff5a' } // lime, like their echo shots
+    });
+  });
 }
 
 function drawBolts() {
@@ -3314,8 +3450,8 @@ function drawBolts() {
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
-    ctx.strokeStyle = '#a855ff';
-    ctx.shadowColor = '#a855ff';
+    ctx.strokeStyle = b.echo ? '#b4ff5a' : '#a855ff';
+    ctx.shadowColor = b.echo ? '#b4ff5a' : '#a855ff';
     ctx.shadowBlur = 12;
     ctx.lineWidth = 2;
     ctx.stroke();
@@ -3482,13 +3618,14 @@ function findAimTarget() {
 }
 
 function drawBullseye(x, y, r, locked) {
-  const col = locked ? '#ff3355' : 'rgba(168,85,255,0.55)';
+  // yellow bullseye; a lock turns it white-hot with a red centre and ticks
+  const col = locked ? '#fff27a' : 'rgba(255,225,77,0.9)';
   ctx.save();
   ctx.translate(x, y);
   ctx.strokeStyle = col;
-  ctx.shadowColor = locked ? '#ff3355' : '#a855ff';
-  ctx.shadowBlur = locked ? 14 : 6;
-  ctx.lineWidth = locked ? 2 : 1.5;
+  ctx.shadowColor = '#ffe14d';
+  ctx.shadowBlur = locked ? 18 : 10;
+  ctx.lineWidth = locked ? 3.5 : 2.5;
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.stroke();
@@ -3496,9 +3633,10 @@ function drawBullseye(x, y, r, locked) {
   ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(0, 0, Math.max(1.5, r * 0.08), 0, Math.PI * 2);
-  ctx.fillStyle = col;
+  ctx.arc(0, 0, Math.max(2, r * 0.1), 0, Math.PI * 2);
+  ctx.fillStyle = locked ? '#ff3355' : col;
   ctx.fill();
+  if (locked) ctx.strokeStyle = '#ff3355';
   // four rotating tick marks; a locked target's ticks spin in and pulse
   ctx.rotate(locked ? t * 3 : t * 0.6);
   const inner = r * (locked ? 1.1 + Math.sin(t * 10) * 0.08 : 1.15);
@@ -3516,29 +3654,31 @@ function drawAimLine() {
   // kept straight and unswirled: this is the player's own fixed reticle, not world geometry
   const outer = pointOnRing(aimAngle, 0.0, { visual: false });
   const inner = pointOnRing(aimAngle, 0.12, { visual: false });
+  // all targeting reads in bright yellow so it pops against the purple tunnel
   ctx.beginPath();
   ctx.moveTo(inner.x, inner.y);
   ctx.lineTo(outer.x, outer.y);
-  ctx.strokeStyle = 'rgba(168,85,255,0.6)';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,225,77,0.9)';
+  ctx.shadowColor = '#ffe14d';
+  ctx.shadowBlur = 10;
+  ctx.lineWidth = 3.5;
   ctx.stroke();
 
   // reticle
   ctx.beginPath();
-  ctx.arc(outer.x, outer.y, 10, 0, Math.PI * 2);
-  ctx.strokeStyle = '#a855ff';
-  ctx.shadowColor = '#a855ff';
-  ctx.shadowBlur = 10;
-  ctx.lineWidth = 2;
+  ctx.arc(outer.x, outer.y, 12, 0, Math.PI * 2);
+  ctx.strokeStyle = '#ffe14d';
+  ctx.lineWidth = 3;
   ctx.stroke();
   ctx.shadowBlur = 0;
 
   if (state !== 'playing') return;
   // dotted firing line: the path a bolt will actually take down the tunnel
-  ctx.fillStyle = 'rgba(168,85,255,0.45)';
-  for (let z = 0.06; z < 0.6; z += 0.045) {
+  ctx.fillStyle = 'rgba(255,225,77,0.85)';
+  for (let z = 0.06; z < 0.6; z += 0.04) {
     const pt = pointOnRing(aimAngle, z);
-    ctx.fillRect(pt.x - 1.5, pt.y - 1.5, 3, 3);
+    const d = 5 - z * 4; // dots shrink with distance
+    ctx.fillRect(pt.x - d / 2, pt.y - d / 2, d, d);
   }
   const target = findAimTarget();
   if (target) {
@@ -3552,11 +3692,26 @@ function drawAimLine() {
 }
 
 // ---------- Loop ----------
+// live preview of the selected ship (class + colour) on the title screen
+const previewCanvas = document.getElementById('shippreview');
+const previewCtx = previewCanvas.getContext('2d');
+function drawShipPreview() {
+  previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+  drawShip({
+    g: previewCtx,
+    x: previewCanvas.width / 2,
+    y: previewCanvas.height / 2 + 4 + Math.sin(t * 2.6) * 2,
+    s: 34 * SHIP_CLASSES[shipClassIndex].scale,
+    lean: Math.sin(t * 0.9) * 0.12
+  });
+}
+
 function loop(now) {
   const dt = Math.min(0.05, (now - lastTime) / 1000);
   lastTime = now;
   update(dt);
   draw();
+  if (state === 'title') drawShipPreview();
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);

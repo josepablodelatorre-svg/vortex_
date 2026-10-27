@@ -197,6 +197,20 @@ its Spanish one; newer lines are `{ en, es }` objects read via `L()`.
 `arcadeCaps()` drops accents on capitals because the pixel font draws
 them at lowercase height.
 
+**Ship shapes** — `SHIP_SHAPES[i]` gives each class its own silhouette
+(hull polygon, facets, struts/barrels, pods, engine mouths, cores);
+`drawShip(opts)` draws any of them, live by default or into another
+context (the title's `#shippreview`, redrawn every frame on the title).
+
+**Echo pickup** — lime ripples: for `ECHO_DURATION` every shot is queued in
+`echoQueue` and replayed `ECHO_DELAYS` (0.2s, 0.4s) later down the same
+lane as lime `echo` bolts, fired by two lime ghost ships
+(`drawEchoGhosts()`) that trail the ship's recorded path (`echoTrail`).
+
+**Targeting** — aim line, rim reticle, dotted firing line and bullseye are
+bright yellow and thicker; a lock turns the bullseye white-hot with a red
+centre and ticks.
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups
