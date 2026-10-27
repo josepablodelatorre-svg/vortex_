@@ -24,10 +24,14 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await ev('enemies[0].z = 0.02; enemies[0].angle = normalizeAngle(shipLane + 1.2)');
   ok(await until(`tutorial && TUTORIAL_STEPS[tutorial.step].id === 'pickup'`), 'letting it pass outside the lane completes step 4');
   await ev('collectPowerup(powerups[0]); powerups = []');
-  ok(await until(`tutorial && TUTORIAL_STEPS[tutorial.step].id === 'bomb'`), 'collecting the pickup completes step 5');
+  ok(await until(`tutorial && TUTORIAL_STEPS[tutorial.step].id === 'coins'`), 'collecting the pickup completes step 5');
+  ok(await ev(`trackItems.filter(i => i.kind === 'coin').length`) === 5, 'a row of five coins comes down a lane');
+  await ev(`aimAngle = tutorial.coinAngle`);
+  ok(await until(`tutorial && TUTORIAL_STEPS[tutorial.step].id === 'bomb'`, 15000), 'steering into the coin lane and collecting completes step 6');
+  ok(await ev('runCoins') >= 3, 'coins were collected (' + await ev('runCoins') + ')');
   ok(await ev('zapperCharges >= 1 && enemies.length === 6'), 'six hostiles and a bomb ready');
   await p.keyboard.press('Space');
-  ok(await until(`tutorial && TUTORIAL_STEPS[tutorial.step].id === 'lockin'`), 'bombing completes step 6');
+  ok(await until(`tutorial && TUTORIAL_STEPS[tutorial.step].id === 'lockin'`), 'bombing completes step 7');
   ok(await ev('power') === 100, 'power bar is filled for the lock-in lesson');
   await p.keyboard.press('KeyL');
   ok(await until('!tutorial'), 'lock-in finishes the tutorial');

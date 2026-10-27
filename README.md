@@ -454,9 +454,20 @@ heal 45 (of `HULL_MAX = 150`, raised from 100 to make runs last).
   `bossActive`), so there's a way to heal during the hardest parts.
 
 **Audio**
-- WebAudio procedural SFX (`playBass`, `playZap`, `playHit`, `playDamage`,
-  `playPowerUp`, `playEnemyShot`, `playBossHit`) — no audio files, pure
-  oscillators.
+- Sound effects are a small 80s/early-90s synth built on WebAudio, no
+  samples: `voice()` (detuned saw/square/noise unison through a resonant
+  filter sweep, Moog-style) and `fm()` (two-operator FM, DX7-style bells,
+  clangs and e-piano blips) feed one effects chain in `sfxOut()`: SFX-slider
+  gain → soft analog drive (`makeDriveCurve`) → Juno-style stereo chorus,
+  plus an echo send (`echoBus`, dark feedback delay). Effects: `playZap`
+  (laser), `playBass` (its thump), `playHit` (kill: FM snap + noise crack),
+  `playEnemyShot`, `playDamage` (growl), `playPowerUp` (chorused arpeggio),
+  `playBossHit` (FM clang + sub), `playComms`, `playHack`, and `playCoin`:
+  each coin of a run plays the next note up a pentatonic scale
+  (`COIN_SCALE`), so a row of five rings out as a rising arpeggio.
+- Coins are collected by flying through them (in your lane as they reach
+  you); a coin lined up with your lane glows and pulses, and each one pops
+  a gold sparkle and `+1`. The tutorial has a coins step.
 - Background music is four `<audio>` elements (`MUSIC_TRACKS`: garden,
   destruction, rift, boss) crossfaded by `setMusicTrack()` on every state
   change. All are 160 kbps MP3 at about -10 LUFS, peak-limited (4x

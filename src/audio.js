@@ -54,17 +54,6 @@ function audioOut() {
   return masterOut;
 }
 
-// sound effects go through their own gain (the SFX slider) into masterOut
-let sfxBus = null;
-function sfxOut() {
-  if (!sfxBus) {
-    sfxBus = actx.createGain();
-    sfxBus.gain.value = settings.sfx;
-    sfxBus.connect(audioOut());
-  }
-  return sfxBus;
-}
-
 function initAudio() {
   if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
   initMusicAnalyser();
@@ -270,141 +259,249 @@ function gameplayTrack() {
   return gameMode === 'rift' ? 'rift' : 'destruction';
 }
 
+// ---------- Sound effects: a small 80s/early-90s synth ----------
+// Every effect is a few synth voices, not samples: detuned saws and pulses
+// through a resonant low-pass (Moog-style squelch), DX7-style FM for bells
+// and metallic hits, filtered noise for snaps. They play into one effects
+// chain (sfxOut): a soft tape/analog drive, a Juno-style stereo chorus, and
+// an echo some voices send to. Sound only, so it's all fire-and-forget.
+let sfxBus = null;   // input of the effects chain; its gain is the SFX slider
+let echoBus = null;
+let noiseBuffer = null;
+
+function makeDriveCurve(amount) {
+  const n = 1024, curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    curve[i] = Math.tanh(x * amount) / Math.tanh(amount);
+  }
+  return curve;
+}
+
+function sfxOut() {
+  if (!sfxBus) {
+    const out = audioOut();
+    sfxBus = actx.createGain();
+    sfxBus.gain.value = settings.sfx;
+    // gentle saturation: rounds the peaks like an analog desk
+    const drive = actx.createWaveShaper();
+    drive.curve = makeDriveCurve(1.6);
+    drive.oversample = '2x';
+    sfxBus.connect(drive);
+    drive.connect(out);
+    // Juno-style chorus: two short delays swept by slow LFOs, panned apart
+    for (const [rate, pan] of [[0.6, -0.7], [0.83, 0.7]]) {
+      const d = actx.createDelay(0.05);
+      d.delayTime.value = 0.012;
+      const lfo = actx.createOscillator();
+      const depth = actx.createGain();
+      lfo.frequency.value = rate;
+      depth.gain.value = 0.004;
+      lfo.connect(depth);
+      depth.connect(d.delayTime);
+      lfo.start();
+      const wet = actx.createGain();
+      wet.gain.value = 0.35;
+      const p = actx.createStereoPanner ? actx.createStereoPanner() : null;
+      drive.connect(d);
+      d.connect(wet);
+      if (p) { p.pan.value = pan; wet.connect(p); p.connect(out); } else wet.connect(out);
+    }
+    // echo send: a dark feedback delay, like a tape or BBD unit
+    echoBus = actx.createGain();
+    echoBus.gain.value = 1;
+    const echo = actx.createDelay(1);
+    echo.delayTime.value = 0.27;
+    const fb = actx.createGain();
+    fb.gain.value = 0.32;
+    const tone = actx.createBiquadFilter();
+    tone.type = 'lowpass';
+    tone.frequency.value = 2400;
+    echoBus.connect(echo);
+    echo.connect(tone);
+    tone.connect(fb);
+    fb.connect(echo);
+    const echoOut = actx.createGain();
+    echoOut.gain.value = 0.28;
+    tone.connect(echoOut);
+    echoOut.connect(sfxBus);
+  }
+  return sfxBus;
+}
+
+function noise() {
+  if (!noiseBuffer) {
+    noiseBuffer = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  }
+  const src = actx.createBufferSource();
+  src.buffer = noiseBuffer;
+  return src;
+}
+
+// One synth voice. o: wave ('sawtooth' | 'square' | 'triangle' | 'sine' |
+// 'noise'), freq -> freqEnd over glide s, detune: cents for extra detuned
+// copies (a fat unison), attack/decay envelope to vol, an optional filter
+// { type, freq, freqEnd, q } swept over the decay, delay start, echo send.
+function voice(o) {
+  const at = actx.currentTime + (o.delay || 0);
+  const dur = (o.attack || 0.002) + o.decay;
+  const amp = actx.createGain();
+  amp.gain.setValueAtTime(0.0001, at);
+  amp.gain.exponentialRampToValueAtTime(o.vol, at + (o.attack || 0.002));
+  amp.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  let head = amp;
+  if (o.filter) {
+    const f = actx.createBiquadFilter();
+    f.type = o.filter.type || 'lowpass';
+    f.Q.value = o.filter.q || 1;
+    f.frequency.setValueAtTime(o.filter.freq, at);
+    if (o.filter.freqEnd) f.frequency.exponentialRampToValueAtTime(o.filter.freqEnd, at + dur);
+    f.connect(amp);
+    head = f;
+  }
+  amp.connect(sfxOut());
+  if (o.echo) {
+    const send = actx.createGain();
+    send.gain.value = o.echo;
+    amp.connect(send);
+    send.connect(echoBus);
+  }
+  const copies = o.wave === 'noise' ? [0] : (o.detune || [0]);
+  for (const cents of copies) {
+    const src = o.wave === 'noise' ? noise() : actx.createOscillator();
+    if (o.wave !== 'noise') {
+      src.type = o.wave;
+      src.detune.value = cents;
+      src.frequency.setValueAtTime(o.freq, at);
+      if (o.freqEnd) src.frequency.exponentialRampToValueAtTime(o.freqEnd, at + (o.glide || dur));
+    }
+    const g = actx.createGain();
+    g.gain.value = 1 / Math.sqrt(copies.length);
+    src.connect(g);
+    g.connect(head);
+    src.start(at);
+    src.stop(at + dur + 0.02);
+  }
+}
+
+// DX7-style two-operator FM: a sine modulator (ratio x carrier) whose depth
+// decays faster than the note, so it starts bright and metallic and melts
+// into a pure tone. Bells, clangs, electric-piano blips.
+function fm(o) {
+  const at = actx.currentTime + (o.delay || 0);
+  const car = actx.createOscillator();
+  const mod = actx.createOscillator();
+  const modGain = actx.createGain();
+  const amp = actx.createGain();
+  car.type = 'sine';
+  mod.type = 'sine';
+  car.frequency.setValueAtTime(o.freq, at);
+  mod.frequency.setValueAtTime(o.freq * o.ratio, at);
+  if (o.freqEnd) {
+    car.frequency.exponentialRampToValueAtTime(o.freqEnd, at + o.decay);
+    mod.frequency.exponentialRampToValueAtTime(o.freqEnd * o.ratio, at + o.decay);
+  }
+  modGain.gain.setValueAtTime(o.freq * o.index, at);
+  modGain.gain.exponentialRampToValueAtTime(o.freq * 0.05 + 1, at + o.decay * (o.brightFor || 0.4));
+  amp.gain.setValueAtTime(0.0001, at);
+  amp.gain.exponentialRampToValueAtTime(o.vol, at + 0.003);
+  amp.gain.exponentialRampToValueAtTime(0.0001, at + o.decay);
+  mod.connect(modGain);
+  modGain.connect(car.frequency);
+  car.connect(amp);
+  amp.connect(sfxOut());
+  if (o.echo) {
+    const send = actx.createGain();
+    send.gain.value = o.echo;
+    amp.connect(send);
+    send.connect(echoBus);
+  }
+  for (const n of [car, mod]) { n.start(at); n.stop(at + o.decay + 0.02); }
+}
+
+// the shot's low thump: a Minimoog-style bass blip, saw + sub through a
+// resonant low-pass that snaps shut
 function playBass(freq = 80, dur = 0.25) {
   if (!actx) return;
-  const osc = actx.createOscillator();
-  const gain = actx.createGain();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(freq, actx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(freq * 0.5, actx.currentTime + dur);
-  gain.gain.setValueAtTime(0.4, actx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
-  osc.connect(gain);
-  gain.connect(sfxOut());
-  osc.start();
-  osc.stop(actx.currentTime + dur);
+  voice({ wave: 'sawtooth', freq, freqEnd: freq * 0.5, decay: dur, vol: 0.22, detune: [-7, 7],
+          filter: { freq: 1400, freqEnd: 90, q: 7 } });
+  voice({ wave: 'square', freq: freq / 2, freqEnd: freq / 4, decay: dur * 0.8, vol: 0.12,
+          filter: { freq: 400, q: 1 } });
 }
 
+// player laser: detuned saws diving in pitch through a squelchy filter sweep
 function playZap() {
   if (!actx) return;
-  const osc = actx.createOscillator();
-  const gain = actx.createGain();
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(900, actx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(120, actx.currentTime + 0.12);
-  gain.gain.setValueAtTime(0.25, actx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.12);
-  osc.connect(gain);
-  gain.connect(sfxOut());
-  osc.start();
-  osc.stop(actx.currentTime + 0.12);
+  voice({ wave: 'sawtooth', freq: 1250, freqEnd: 260, glide: 0.11, decay: 0.12, vol: 0.13, detune: [-10, 0, 10],
+          filter: { freq: 7000, freqEnd: 500, q: 9 }, echo: 0.15 });
 }
 
+// enemy destroyed: an FM metallic snap over a filtered noise crack, like an
+// early drum machine's tom and clap mashed together
 function playHit() {
   if (!actx) return;
-  const osc = actx.createOscillator();
-  const gain = actx.createGain();
-  osc.type = 'square';
-  osc.frequency.setValueAtTime(220, actx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(60, actx.currentTime + 0.2);
-  gain.gain.setValueAtTime(0.3, actx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.2);
-  osc.connect(gain);
-  gain.connect(sfxOut());
-  osc.start();
-  osc.stop(actx.currentTime + 0.2);
+  fm({ freq: 330, freqEnd: 70, ratio: 1.41, index: 6, decay: 0.22, vol: 0.2 });
+  voice({ wave: 'noise', decay: 0.12, vol: 0.18, filter: { type: 'bandpass', freq: 3200, freqEnd: 700, q: 2 } });
 }
 
+// taking damage: a growling detuned saw falling through a closing filter
 function playDamage() {
   if (!actx) return;
-  const osc = actx.createOscillator();
-  const gain = actx.createGain();
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(140, actx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(40, actx.currentTime + 0.35);
-  gain.gain.setValueAtTime(0.35, actx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.35);
-  osc.connect(gain);
-  gain.connect(sfxOut());
-  osc.start();
-  osc.stop(actx.currentTime + 0.35);
+  voice({ wave: 'sawtooth', freq: 150, freqEnd: 38, decay: 0.42, vol: 0.17, detune: [-22, 0, 19],
+          filter: { freq: 2200, freqEnd: 120, q: 12 } });
+  voice({ wave: 'noise', decay: 0.18, vol: 0.14, filter: { freq: 1800, freqEnd: 200, q: 1 } });
 }
 
+// pickup: a quick Juno arpeggio up a major chord, chorused and echoed
 function playPowerUp() {
   if (!actx) return;
-  const osc = actx.createOscillator();
-  const gain = actx.createGain();
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(440, actx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(880, actx.currentTime + 0.2);
-  gain.gain.setValueAtTime(0.3, actx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.25);
-  osc.connect(gain);
-  gain.connect(sfxOut());
-  osc.start();
-  osc.stop(actx.currentTime + 0.25);
-}
-
-// the rival's signature: a falling, buzzing sawtooth
-function playHack() {
-  if (!actx) return;
-  const osc = actx.createOscillator();
-  const gain = actx.createGain();
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(420, actx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(60, actx.currentTime + 0.35);
-  gain.gain.setValueAtTime(0.07, actx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.38);
-  osc.connect(gain);
-  gain.connect(sfxOut());
-  osc.start();
-  osc.stop(actx.currentTime + 0.4);
-}
-
-// radio blip: two short square chirps ahead of each transmission
-function playComms() {
-  if (!actx) return;
-  [[1320, 0], [990, 0.07]].forEach(([freq, delay]) => {
-    const osc = actx.createOscillator();
-    const gain = actx.createGain();
-    const at = actx.currentTime + delay;
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(freq, at);
-    gain.gain.setValueAtTime(0.05, at);
-    gain.gain.exponentialRampToValueAtTime(0.001, at + 0.06);
-    osc.connect(gain);
-    gain.connect(sfxOut());
-    osc.start(at);
-    osc.stop(at + 0.07);
+  [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+    voice({ wave: 'square', freq: f, decay: 0.12, vol: 0.075, detune: [-6, 6], delay: i * 0.055,
+            filter: { freq: 5000, freqEnd: 1200, q: 3 }, echo: 0.35 });
   });
 }
 
-function playEnemyShot() {
+// the rival's signature: a ring-mod-ish clash of two saws, falling
+function playHack() {
   if (!actx) return;
-  const osc = actx.createOscillator();
-  const gain = actx.createGain();
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(500, actx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(220, actx.currentTime + 0.18);
-  gain.gain.setValueAtTime(0.2, actx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.18);
-  osc.connect(gain);
-  gain.connect(sfxOut());
-  osc.start();
-  osc.stop(actx.currentTime + 0.18);
+  voice({ wave: 'sawtooth', freq: 420, freqEnd: 55, decay: 0.4, vol: 0.06, detune: [0, 433],
+          filter: { freq: 3000, freqEnd: 300, q: 14 }, echo: 0.4 });
 }
 
+// radio blip: two DX electric-piano chirps ahead of each transmission
+function playComms() {
+  if (!actx) return;
+  fm({ freq: 1320, ratio: 1, index: 2.5, decay: 0.08, vol: 0.13 });
+  fm({ freq: 990, ratio: 1, index: 2.5, decay: 0.08, vol: 0.13, delay: 0.07 });
+}
+
+// enemy shot: a resonant pulse "peww"
+function playEnemyShot() {
+  if (!actx) return;
+  voice({ wave: 'square', freq: 620, freqEnd: 190, decay: 0.2, vol: 0.08,
+          filter: { freq: 2600, freqEnd: 400, q: 10 } });
+}
+
+// boss hit: a heavy FM clang over a sub thump
 function playBossHit() {
   if (!actx) return;
-  const osc = actx.createOscillator();
-  const gain = actx.createGain();
-  osc.type = 'square';
-  osc.frequency.setValueAtTime(160, actx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(50, actx.currentTime + 0.3);
-  gain.gain.setValueAtTime(0.35, actx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.3);
-  osc.connect(gain);
-  gain.connect(sfxOut());
-  osc.start();
-  osc.stop(actx.currentTime + 0.3);
+  fm({ freq: 110, freqEnd: 55, ratio: 3.5, index: 9, decay: 0.4, vol: 0.22, brightFor: 0.25 });
+  voice({ wave: 'sine', freq: 90, freqEnd: 40, decay: 0.3, vol: 0.3 });
+}
+
+// coin: each coin of a run plays the next note up a pentatonic scale (a
+// DX bell with a soft square under it), so a row of five rings out as a
+// rising arpeggio; a pause of over a second starts the scale again
+const COIN_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
+let coinNote = 0, lastCoinAt = -9;
+function playCoin() {
+  if (!actx) return;
+  if (t - lastCoinAt > 1.1) coinNote = 0;
+  lastCoinAt = t;
+  const f = 880 * Math.pow(2, COIN_SCALE[Math.min(coinNote, COIN_SCALE.length - 1)] / 12);
+  coinNote += 1;
+  fm({ freq: f, ratio: 3.5, index: 1.8, decay: 0.32, vol: 0.12, echo: 0.3 });
+  voice({ wave: 'square', freq: f / 2, decay: 0.09, vol: 0.04, filter: { freq: 3000, q: 1 } });
 }

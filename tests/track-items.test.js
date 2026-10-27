@@ -18,7 +18,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(await ev('brakeTimer > 2 && boostTimer === 0'), 'a zebra pad slows everything');
   await put('boost', 1.5); await wait(150);
   ok(await ev('brakeTimer > 0 && boostTimer === 0'), 'a pad outside your lane does nothing');
-  await put('hoop', 0); await wait(150);
+  await put('hoop', 0); await p.waitForFunction(() => tripTimer > 2 && canvas.style.filter.includes('hue-rotate'), null, { timeout: 4000 }).catch(() => {});
   ok(await ev('tripTimer > 2') && (await ev('canvas.style.filter')).includes('hue-rotate'), 'a hoop starts the psychedelic trip');
   ok(await ev('tripleLaserTimer > 0 || echoTimer > 0 || plasma > plasmaMax || discCharges > 0'), 'a hoop grants an ability');
   const lane0 = await ev('shipLane');

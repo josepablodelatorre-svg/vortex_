@@ -140,7 +140,9 @@ function updateTrack(dt) {
           addCoins(1);
           missionEvent('coin');
           it.got = true;
-          playZap();
+          playCoin();
+          // a gold sparkle and a +1 where it was grabbed
+          burst(it.angle, 0.04, { color: '255,210,63', bitColor: '#ffd23f', label: '+1', labelColor: '#ffe680' });
         }
       }
       continue;
@@ -170,14 +172,17 @@ function drawTrackItems() {
       // a spinning gold coin standing just off the floor
       const pt = pointOnRing(it.angle, it.z);
       const x = pt.x + (CX - pt.x) * 0.05, y = pt.y + (CY - pt.y) * 0.05;
-      const r = 3 + 12 * near;
+      // lined up with the ship's lane: brighter, bigger, pulsing, so you
+      // can see you're on course to collect it
+      const onCourse = inShipLane(it.angle, TRACK_HIT + 0.08 * up('magnet'));
+      const r = (3 + 12 * near) * (onCourse ? 1.25 + Math.sin(t * 12) * 0.08 : 1);
       ctx.beginPath();
       ctx.ellipse(x, y, r * Math.abs(Math.cos(t * 4 + it.z * 20)) + 1, r, 0, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,210,63,0.35)';
+      ctx.fillStyle = onCourse ? 'rgba(255,240,150,0.7)' : 'rgba(255,210,63,0.3)';
       ctx.fill();
-      ctx.strokeStyle = '#ffd23f';
+      ctx.strokeStyle = onCourse ? '#fff6c8' : '#ffd23f';
       ctx.shadowColor = '#ffd23f';
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = onCourse ? 20 : 8;
       ctx.lineWidth = 2;
       ctx.stroke();
       ctx.shadowBlur = 0;

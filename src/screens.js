@@ -80,6 +80,9 @@ const TUTORIAL_STEPS = [
   { id: 'pickup',
     en: () => 'PICKUPS GIVE YOU POWERS. SHOOT IT OR FLY INTO IT.',
     es: () => 'LOS OBJETOS TE DAN PODERES. DISPARALE O VUELA HACIA EL.' },
+  { id: 'coins',
+    en: () => 'COINS! STEER INTO THEIR LANE AND FLY THROUGH THEM. THEY LIGHT UP WHEN YOU ARE LINED UP.',
+    es: () => '¡MONEDAS! PONTE EN SU CARRIL Y ATRAVIESALAS. SE ILUMINAN CUANDO ESTAS ALINEADO.' },
   { id: 'bomb',
     en: () => isTouch ? 'SURROUNDED? TAP BOMB TO CLEAR THE SCREEN.' : 'SURROUNDED? PRESS SPACE (OR RIGHT-CLICK) TO DROP A BOMB.',
     es: () => isTouch ? '¿RODEADO? TOCA BOMB PARA LIMPIAR LA PANTALLA.' : '¿RODEADO? PRESIONA ESPACIO (O CLIC DERECHO) PARA SOLTAR UNA BOMBA.' },
@@ -127,6 +130,12 @@ function nextTutorialStep() {
     enemies.at(-1).fireTimer = 99;
   } else if (step.id === 'pickup') {
     powerups.push({ angle: normalizeAngle(shipLane + 0.3), z: 0.9, alive: true, kind: 'star' });
+  } else if (step.id === 'coins') {
+    // a row off to one side, so you have to steer to it
+    const angle = normalizeAngle(shipLane + (shipLane > Math.PI / 2 || shipLane < -Math.PI / 2 ? 0.9 : -0.9));
+    tutorial.coins = runCoins;
+    tutorial.coinAngle = Math.abs(angle) < Math.PI / 2 ? normalizeAngle(Math.PI - 0.9) : angle;
+    for (let k = 0; k < 5; k++) trackItems.push({ kind: 'coin', angle: tutorial.coinAngle, z: 0.8 + k * 0.05 });
   } else if (step.id === 'bomb') {
     zapperCharges = Math.max(1, zapperCharges);
     updateZapUI();
@@ -170,6 +179,7 @@ function updateTutorial(dt) {
     // got hit instead: that's the lesson too, move on
     completeTutorialStep();
   } else if (id === 'pickup' && !powerups.length) completeTutorialStep();
+  else if (id === 'coins' && (runCoins - tutorial.coins >= 3 || !trackItems.some(i => i.kind === 'coin' && !i.done))) completeTutorialStep();
   else if (id === 'bomb' && !enemies.length) completeTutorialStep();
   else if (id === 'lockin' && tutorial.t > 12) completeTutorialStep();
 }
