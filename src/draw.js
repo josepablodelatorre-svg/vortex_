@@ -74,7 +74,7 @@ function draw() {
     }
     ctx.restore();
     if (viewMode === 'cockpit' && state === 'playing') drawCockpit();
-    if (state === 'playing') drawRadar();
+    if (state === 'playing' && viewMode !== 'cockpit') drawRadar();
   }
 }
 
@@ -83,9 +83,9 @@ function draw() {
 // distance from the centre = how close the thing is (rim = at the ship).
 // Unlike the screen, it ignores the vortex swirl and camera bank, so it
 // shows exactly which lane every threat is really in.
-function drawRadar() {
-  const R = Math.max(38, Math.min(62, Math.min(W, H) * 0.09));
-  const cx = W - R - 18, cy = R + 18;
+function drawRadar(cxIn, cyIn, rIn, inDash) {
+  const R = rIn || Math.max(38, Math.min(62, Math.min(W, H) * 0.09));
+  const cx = cxIn || W - R - 18, cy = cyIn || R + 18;
   const at = (angle, z) => {
     const d = (1 - Math.max(0, Math.min(1, z))) * R * 0.92;
     return [cx + Math.sin(angle) * d, cy - Math.cos(angle) * d];
@@ -138,7 +138,7 @@ function drawRadar() {
   ctx.fillStyle = 'rgba(63,255,102,0.7)';
   ctx.font = "7px 'Press Start 2P', 'Courier New', monospace";
   ctx.textAlign = 'center';
-  ctx.fillText('RADAR', cx, cy + R + 11);
+  if (!inDash) ctx.fillText('RADAR', cx, cy + R + 11);
   ctx.restore();
 }
 

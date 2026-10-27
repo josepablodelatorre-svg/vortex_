@@ -124,7 +124,13 @@ body:not(.inrun) #hud { display: none !important; }
 #powerfill { width: 0%; background: #ffe14d; box-shadow: 0 0 6px #ffe14d; }
 #plasmafill.over { background: #e8fdff; box-shadow: 0 0 10px #50e6ff; }
 /* cockpit view draws hull, plasma and power on the dashboard */
-body.cockpitview #hullrow, body.cockpitview #plasmarow, body.cockpitview #powerrow { display: none; }
+body.cockpitview #hud { display: none; } /* the dashboard shows it all */
+/* cockpit: the overlays move inside the glass, clear of the dashboard
+   (--cp-dash / --cp-side / --cp-top come from cockpitLayout()) */
+body.cockpitview #comms { left: calc(var(--cp-side) + 10px); right: auto; bottom: calc(var(--cp-dash) + 10px); }
+body.cockpitview #zapBtn { right: calc(var(--cp-side) + 10px); bottom: calc(var(--cp-dash) + 10px); }
+body.cockpitview #lockBtn { right: calc(var(--cp-side) + 10px); bottom: calc(var(--cp-dash) + 66px); }
+body.cockpitview #pauseBtn { top: calc(var(--cp-top) + 10px) !important; right: calc(var(--cp-side) + 10px); }
 #powerfill.full { animation: cursorBlink 0.5s infinite; }
 #hullfill {
   height: 100%;

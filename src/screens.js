@@ -267,6 +267,11 @@ function syncRunClass() {
   document.body.classList.toggle('inrun', state === 'playing' || state === 'gameover' || state === 'cleared');
   document.body.classList.toggle('playing', canPause());
   document.body.classList.toggle('cockpitview', viewMode === 'cockpit' && state === 'playing');
+  if (viewMode === 'cockpit') {
+    const L = cockpitLayout();
+    const vars = { '--cp-dash': (H - L.vy1) + 'px', '--cp-side': (L.m + L.side) + 'px', '--cp-top': L.top + 'px' };
+    for (const k in vars) if (document.body.style.getPropertyValue(k) !== vars[k]) document.body.style.setProperty(k, vars[k]);
+  }
   // the pause button sits just under the radar, whose size follows the screen
   const top = Math.round(2 * Math.max(38, Math.min(62, Math.min(W, H) * 0.09)) + 30) + 'px';
   if (pauseBtnEl.style.top !== top) pauseBtnEl.style.top = top;

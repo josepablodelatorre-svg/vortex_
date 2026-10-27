@@ -425,9 +425,17 @@ run tier, score and the mission progress. CONTINUE on SIGNAL LOST
 **Cockpit view** — SETTINGS → VIEW: CHASE / COCKPIT (`viewMode`, saved as
 `vortex-view`). In cockpit the ship isn't drawn; the world is rotated by
 `viewRot` (`COCKPIT_TURN` × the ship lane's offset from the bottom, < 1 so
-aim and lane settle) and `drawCockpit()` overlays a canopy frame, struts
-and a dashboard with HULL/PLASMA dials, a POWER bar and console lights,
-all jolting on hits. `updateAimFromPointer()` adds `viewRot` back so aiming
+aim and lane settle) and `drawCockpit()` frames it like an early-90s
+handheld flight sim in VORTEX neon (`cockpitLayout()` sizes it): a heavy
+bezel with dithered corners round a rounded window, a mission clock plate
+(counting down on survive missions), score and level on the bezel, a speed
+ladder (left), hull + plasma cells (right), a compass strip with hazard
+stripes, and a dashboard with a LOCK ON / SCAN / LOCK-IN panel, power
+cells, the radar scope (`drawRadar(cx, cy, r, true)`) over the flight mode,
+a 4×4 sector map filling with the objective (boss cell last), and weapon
+slots (triple, echo, disc, bombs). It all jolts on hits. The HTML HUD hides
+in cockpit and the comms box and BOMB / LOCK / pause buttons move inside
+the glass (`--cp-*` CSS variables set in `syncRunClass()`). `updateAimFromPointer()` adds `viewRot` back so aiming
 stays where you point.
 
 **Hull / damage** — `damageShip(amount)` is the one shared path for
