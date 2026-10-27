@@ -13,7 +13,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(await ev('env') === 'tube', 'level 1 is the tunnel');
   await ev('nextMinibossIndex = 9; killCount = Math.ceil(currentKillTarget() * 0.6); coresGot = 99; missionTime = 999'); await p.waitForTimeout(800);
   ok(await ev('env') === 'tube', 'still the tunnel past halfway (no mid-level switch)');
-  ok(await ev('midSaved') && JSON.parse(await ev('localStorage.getItem("vortex-checkpoint")') || '{}').mid === true, 'midway checkpoint stored at 50%');
+  ok(await ev('midSaved') && JSON.parse(await ev('store.getItem("vortex-checkpoint")') || '{}').mid === true, 'midway checkpoint stored at 50%');
   // levels 2-5 via the real boss-kill path
   for (const want of ['asteroid', 'space', 'trench', 'surface']) {
     if (want === 'surface') {

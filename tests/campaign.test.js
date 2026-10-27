@@ -49,7 +49,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await ev('damageShip(9999)'); await wait(200);
   await p.goto('http://127.0.0.1:8765/index.html'); await wait(300);
   await p.evaluate(sel => document.querySelector(sel).click(), '#langToggle');
-  ok(await ev('lang') === 'es' && await ev(`localStorage.getItem('vortex-lang')`) === 'es', 'COMMS toggle switches to ES and saves');
+  ok(await ev('lang') === 'es' && await ev(`store.getItem('vortex-lang')`) === 'es', 'COMMS toggle switches to ES and saves');
   await ((await p.evaluate("state === 'title'")) ? p.evaluate('startGame(false)') : p.mouse.click(500, 680)); await wait(1500);
   const line = await ev(`document.getElementById('commstext').textContent`);
   const brief = await ev(`document.getElementById('briefingtitle').textContent + ' | ' + document.getElementById('briefingtext').textContent`);

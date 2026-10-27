@@ -32,7 +32,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await p.keyboard.press('KeyL');
   ok(await until('!tutorial'), 'lock-in finishes the tutorial');
   ok(await ev(`killCount === 0 && score === 0 && zapperCharges >= 1 && hull === hullMax && missionType === 'destroy' && briefingTimer > 0`), 'level 1 then starts clean with its briefing');
-  ok(await ev(`localStorage.getItem('vortex-tutorial')`) === '1' && !(await p.isVisible('#coach')), 'tutorial is remembered and hidden');
+  ok(await ev(`store.getItem('vortex-tutorial')`) === '1' && !(await p.isVisible('#coach')), 'tutorial is remembered and hidden');
   // second run: no tutorial
   await ev('damageShip(99999); plasma = 0; damageShip(99999)'); await p.waitForTimeout(200);
   await ev('startGame(false)'); await p.waitForTimeout(200);

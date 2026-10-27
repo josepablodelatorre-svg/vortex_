@@ -164,6 +164,23 @@ let lastAimSent = 0;
 let fireTimer = null;
 let lastState = { hull: 1, score: 0, st: 'title', zap: 1 };
 
+// the pilot name is shared with the game, inside its one save entry
+// ('vortex-save' = { v, data: { 'vortex-pilot': ... } })
+function savedPilot() {
+  try {
+    const save = JSON.parse(localStorage.getItem('vortex-save') || 'null');
+    return (save && save.data && save.data['vortex-pilot']) || localStorage.getItem('vortex-pilot') || '';
+  } catch (e) { return ''; }
+}
+function savePilot(name) {
+  try {
+    const save = JSON.parse(localStorage.getItem('vortex-save') || 'null') || { v: 1, data: {} };
+    save.data = save.data || {};
+    save.data['vortex-pilot'] = name;
+    localStorage.setItem('vortex-save', JSON.stringify(save));
+  } catch (e) { /* ignore */ }
+}
+
 function send(msg) {
   if (conn && conn.open) conn.send(msg);
 }
@@ -175,7 +192,7 @@ function setMsg(text) {
 function join() {
   if (!hostId) { setMsg('NO GAME TO JOIN: SCAN THE QR CODE ON THE GAME SCREEN'); return; }
   const name = document.getElementById('name').value.trim().toUpperCase().slice(0, 10) || 'GUNNER';
-  try { localStorage.setItem('vortex-pilot', name); } catch (e) { /* ignore */ }
+  savePilot(name);
   setMsg('CONNECTING...');
   if (peer) peer.destroy();
   peer = new Peer(peerOptions());
@@ -258,7 +275,7 @@ setInterval(() => send({ t: 'ping' }), 1000);
 window.addEventListener('pagehide', () => send({ t: 'bye' }));
 document.getElementById('joinBtn').addEventListener('click', join);
 document.getElementById('name').addEventListener('keydown', (e) => { if (e.key === 'Enter') join(); });
-try { document.getElementById('name').value = localStorage.getItem('vortex-pilot') || ''; } catch (e) { /* ignore */ }
+document.getElementById('name').value = savedPilot();
 if (!hostId) setMsg('OPEN THIS BY SCANNING THE QR CODE ON THE GAME SCREEN');
 
 // the pad: a ring of lanes, your reticle on it, and a hint

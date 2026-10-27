@@ -343,6 +343,17 @@ SKIP TUTORIAL leaves at any point; it runs once (`vortex-tutorial`, and
 pilots with a best score never see it) and SETTINGS has PLAY TUTORIAL.
 The panel lets taps through, so firing works under it.
 
+**Save data** — everything the game remembers is one versioned
+localStorage entry, `vortex-save` = `{ v, data }` (`store`, at the top of
+the script). `data` keeps the old item names (`vortex-coins`,
+`vortex-checkpoint`, `vortex-settings`, ...) and `store.getItem/setItem/
+removeItem` mirror localStorage, string values included. On load, any
+separate `vortex-*` keys from older builds are folded in and removed;
+`migrate()` is where future format changes go (bump `SAVE_VERSION`). A
+corrupt entry just starts fresh; a `storage` listener keeps two open tabs
+from writing stale data over each other. `pad.html` reads and writes the
+pilot name inside the same entry.
+
 **Settings** — SETTINGS also has GLOW (AUTO/ON/OFF), VIBRATION and
 MUSIC / SFX sliders, saved in `vortex-settings` (`settings`). Glow is the
 canvas `shadowBlur`, the most expensive effect: the prototype setter is

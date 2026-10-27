@@ -8,7 +8,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const ev = (x) => p.evaluate(x);
   await p.goto('http://127.0.0.1:8765/index.html'); await ev('localStorage.clear()'); await p.reload(); await p.waitForTimeout(300);
   await ev('showScreen("settings")'); await p.click('#viewToggle');
-  ok(await ev('viewMode') === 'cockpit' && await ev(`localStorage.getItem('vortex-view')`) === 'cockpit', 'VIEW toggles to COCKPIT and is saved');
+  ok(await ev('viewMode') === 'cockpit' && await ev(`store.getItem('vortex-view')`) === 'cockpit', 'VIEW toggles to COCKPIT and is saved');
   await ev('startGame(false)'); await ev('briefingTimer = 0; hull = 99999'); await p.waitForTimeout(200);
   await p.mouse.move(800, 600); await p.waitForTimeout(1500);
   const a = await ev('[shipLane, viewRot, aimAngle].map(v => v.toFixed(2)).join(" ")');

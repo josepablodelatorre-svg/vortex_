@@ -10,13 +10,13 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await ev('startGame(false)'); await p.waitForTimeout(200);
   await ev('briefingTimer = 0; trackTimer = 999; spawnTimer = 999');
   await ev(`for (let k = 0; k < 5; k++) trackItems.push({ kind: 'coin', angle: shipLane, z: 0.05 + k * 0.03 })`);
-  await p.waitForTimeout(800);
+  await p.waitForFunction('runCoins >= 5', null, { timeout: 5000 }).catch(() => {});
   ok(await ev('runCoins') === 5 && await ev('coins') === 25, 'flying over a coin row collects 5 coins');
   ok((await ev(`document.getElementById('hudcoins').textContent`)) === 'COINS 5', 'HUD shows run coins');
   await ev(`for (let k = 0; k < 5; k++) trackItems.push({ kind: 'coin', angle: shipLane + 1.5, z: 0.05 + k * 0.03 })`);
   await p.waitForTimeout(800);
   ok(await ev('runCoins') === 5, 'coins outside your lane are missed');
-  ok(await ev(`localStorage.getItem('vortex-coins')`) === '25', 'coins are saved');
+  ok(await ev(`store.getItem('vortex-coins')`) === '25', 'coins are saved');
   // shop
   await ev('coins = 500; saveWallet(); damageShip(99999)'); await p.waitForTimeout(300);
   ok((await ev(`document.getElementById('rankLost').textContent`)).includes('COINS'), 'results show coins earned');

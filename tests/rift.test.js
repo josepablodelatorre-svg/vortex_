@@ -16,7 +16,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await ((await p.evaluate("state === 'title'")) ? p.evaluate('startGame(false)') : p.mouse.click(500, 600)); await p.waitForTimeout(100);
   ok(await ev('state') === 'playing' && await ev('gameMode') === 'campaign', 'title click starts campaign');
   await ev('winGame()');
-  ok(await ev('riftUnlocked') && await ev(`localStorage.getItem('vortex-rift-unlocked')`) === '1', 'winning unlocks + saves rift');
+  ok(await ev('riftUnlocked') && await ev(`store.getItem('vortex-rift-unlocked')`) === '1', 'winning unlocks + saves rift');
   ok(await vis('riftFromCleared'), 'cleared screen shows rift button');
   await p.click('#riftFromCleared'); await p.waitForTimeout(100);
   ok(await ev('state === "playing" && gameMode === "rift" && riftDepth === 1 && runTier === 0'), 'cleared rift button enters rift at depth 1, no NGP bump');
@@ -53,7 +53,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await ev('hull = 1; damageShip(99999)'); await p.waitForTimeout(150);
   ok(await ev('state') === 'gameover', 'dying ends the rift');
   ok((await ev(`document.getElementById('finalscore').textContent`)).includes('DEPTH: 4'), 'game over shows depth');
-  ok(await ev('bestRiftDepth === 4') && await ev(`localStorage.getItem('vortex-best-rift-depth')`) === '4', 'best rift depth saved');
+  ok(await ev('bestRiftDepth === 4') && await ev(`store.getItem('vortex-best-rift-depth')`) === '4', 'best rift depth saved');
   ok(await ev('bestScore === 0'), 'rift score kept out of campaign best');
   await ((await p.evaluate("state === 'title'")) ? p.evaluate('startGame(false)') : p.mouse.click(900, 650)); await p.waitForTimeout(100); // off-center canvas click
   ok(await ev('state === "playing" && gameMode === "rift" && riftDepth === 1'), 'retry (canvas click) restarts the rift');

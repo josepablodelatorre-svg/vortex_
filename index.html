@@ -1294,6 +1294,58 @@
 <script src="lib/peerjs.min.js"></script>
 <script src="lib/qrcode.js"></script>
 <script>
+// ---------- Save data ----------
+// Everything VORTEX remembers lives in ONE versioned localStorage entry,
+// 'vortex-save' = { v, data }, where data is keyed by the item names older
+// builds used as separate keys ('vortex-coins', 'vortex-checkpoint', ...).
+// On load, any of those old separate keys are folded in once and removed.
+// store.getItem / setItem / removeItem mirror localStorage's API (string
+// values), so the rest of the code reads like before.
+const SAVE_KEY = 'vortex-save';
+const SAVE_VERSION = 1;
+const store = (() => {
+  let save = { v: SAVE_VERSION, data: {} };
+  // future format changes go here, one step per version
+  function migrate(sv) {
+    if (!sv.v || sv.v < 1) sv.v = 1;
+    return sv;
+  }
+  function write() {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* storage full or blocked: play on */ }
+  }
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.data === 'object' && parsed.data) save = parsed;
+    }
+    const legacy = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('vortex-') && k !== SAVE_KEY) legacy.push(k);
+    }
+    for (const k of legacy) {
+      save.data[k] = localStorage.getItem(k); // a fresh old-style write wins
+      localStorage.removeItem(k);
+    }
+    const before = save.v;
+    migrate(save);
+    if (legacy.length || save.v !== before) write();
+  } catch (e) { /* storage unavailable: everything stays in memory */ }
+  // another tab saved: pick up its data so this tab doesn't write it back over
+  window.addEventListener('storage', (e) => {
+    if (e.key !== SAVE_KEY || !e.newValue) return;
+    try { save = migrate(JSON.parse(e.newValue)); } catch (err) { /* ignore */ }
+  });
+  return {
+    getItem(k) { return Object.prototype.hasOwnProperty.call(save.data, k) ? save.data[k] : null; },
+    setItem(k, v) { save.data[k] = String(v); write(); },
+    removeItem(k) { delete save.data[k]; write(); },
+    version() { return save.v; },
+    dump() { return JSON.stringify(save); }
+  };
+})();
+
 // Build the title out of individually flickering characters, bookended by
 // blinking terminal-style underscores, like an old CRT losing sync.
 (function buildFlickerTitle() {
@@ -1330,9 +1382,9 @@ resize();
 // glow: 'auto' turns canvas glow (shadowBlur, the costliest effect) off
 // while the frame rate is struggling and back on when it recovers.
 const settings = { music: 1, sfx: 1, glow: 'auto', vibrate: true };
-try { Object.assign(settings, JSON.parse(localStorage.getItem('vortex-settings') || '{}')); } catch (e) { /* ignore */ }
+try { Object.assign(settings, JSON.parse(store.getItem('vortex-settings') || '{}')); } catch (e) { /* ignore */ }
 function saveSettings() {
-  try { localStorage.setItem('vortex-settings', JSON.stringify(settings)); } catch (e) { /* ignore */ }
+  try { store.setItem('vortex-settings', JSON.stringify(settings)); } catch (e) { /* ignore */ }
 }
 let glowActive = settings.glow !== 'off';
 // every 2D context's shadowBlur goes through this, so glow can be cut in one place
@@ -2029,15 +2081,15 @@ let coins = 0;
 let upgrades = {};
 let runCoins = 0;
 try {
-  coins = parseInt(localStorage.getItem('vortex-coins'), 10) || 0;
-  upgrades = JSON.parse(localStorage.getItem('vortex-upgrades') || '{}') || {};
+  coins = parseInt(store.getItem('vortex-coins'), 10) || 0;
+  upgrades = JSON.parse(store.getItem('vortex-upgrades') || '{}') || {};
 } catch (e) { /* storage unavailable */ }
 function up(id) { return upgrades[id] || 0; }
 function upgradeCost(id) { return UPGRADES[id].cost * (up(id) + 1); }
 function saveWallet() {
   try {
-    localStorage.setItem('vortex-coins', String(coins));
-    localStorage.setItem('vortex-upgrades', JSON.stringify(upgrades));
+    store.setItem('vortex-coins', String(coins));
+    store.setItem('vortex-upgrades', JSON.stringify(upgrades));
   } catch (e) { /* ignore */ }
 }
 function addCoins(n) {
@@ -2104,13 +2156,13 @@ const MISSION_POOL = [
 let missionState = { set: 0, active: [] };
 let streak = { days: 0, last: '' };
 try {
-  missionState = JSON.parse(localStorage.getItem('vortex-missions') || 'null') || missionState;
-  streak = JSON.parse(localStorage.getItem('vortex-streak') || 'null') || streak;
+  missionState = JSON.parse(store.getItem('vortex-missions') || 'null') || missionState;
+  streak = JSON.parse(store.getItem('vortex-streak') || 'null') || streak;
 } catch (e) { /* storage unavailable */ }
 
 function missionMult() { return 1 + 0.1 * missionState.set; }
 function saveMissions() {
-  try { localStorage.setItem('vortex-missions', JSON.stringify(missionState)); } catch (e) { /* ignore */ }
+  try { store.setItem('vortex-missions', JSON.stringify(missionState)); } catch (e) { /* ignore */ }
 }
 function dealMissions() {
   const pool = MISSION_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 3);
@@ -2166,7 +2218,7 @@ function checkStreak() {
   const yesterday = y.getFullYear() + '-' + String(y.getMonth() + 1).padStart(2, '0') + '-' + String(y.getDate()).padStart(2, '0');
   streak.days = streak.last === yesterday ? streak.days + 1 : 1;
   streak.last = today;
-  try { localStorage.setItem('vortex-streak', JSON.stringify(streak)); } catch (e) { /* ignore */ }
+  try { store.setItem('vortex-streak', JSON.stringify(streak)); } catch (e) { /* ignore */ }
   const reward = 20 * Math.min(7, streak.days);
   coins += reward;
   saveWallet();
@@ -2180,7 +2232,7 @@ function checkStreak() {
 // restarts from there with the score you had. Not for daily / Rift /
 // versus runs, which are about one clean run.
 let checkpoint = null;
-try { checkpoint = JSON.parse(localStorage.getItem('vortex-checkpoint') || 'null'); } catch (e) { checkpoint = null; }
+try { checkpoint = JSON.parse(store.getItem('vortex-checkpoint') || 'null'); } catch (e) { checkpoint = null; }
 
 function saveCheckpoint(mid) {
   if (gameMode !== 'campaign' || daily || versus) return;
@@ -2188,13 +2240,13 @@ function saveCheckpoint(mid) {
     level: currentLevel, runTier, score, mid,
     killCount, coresGot, missionTime, nextMinibossIndex, missionType
   };
-  try { localStorage.setItem('vortex-checkpoint', JSON.stringify(checkpoint)); } catch (e) { /* ignore */ }
+  try { store.setItem('vortex-checkpoint', JSON.stringify(checkpoint)); } catch (e) { /* ignore */ }
   shipCallout('CHECKPOINT', '#3f6');
 }
 
 function clearCheckpoint() {
   checkpoint = null;
-  try { localStorage.removeItem('vortex-checkpoint'); } catch (e) { /* ignore */ }
+  try { store.removeItem('vortex-checkpoint'); } catch (e) { /* ignore */ }
 }
 
 function checkpointLabel() {
@@ -2409,9 +2461,9 @@ let riftUnlocked = false;
 let bestRiftDepth = 0;
 let bestRiftScore = 0;
 try {
-  riftUnlocked = localStorage.getItem('vortex-rift-unlocked') === '1';
-  bestRiftDepth = parseInt(localStorage.getItem('vortex-best-rift-depth'), 10) || 0;
-  bestRiftScore = parseInt(localStorage.getItem('vortex-best-rift-score'), 10) || 0;
+  riftUnlocked = store.getItem('vortex-rift-unlocked') === '1';
+  bestRiftDepth = parseInt(store.getItem('vortex-best-rift-depth'), 10) || 0;
+  bestRiftScore = parseInt(store.getItem('vortex-best-rift-score'), 10) || 0;
 } catch (e) { /* storage unavailable, keep defaults */ }
 
 // extra escalation the Rift layers on top of runTier, half a run tier per sector
@@ -2543,7 +2595,7 @@ function enterRiftSector() {
 function unlockRift() {
   if (riftUnlocked) return;
   riftUnlocked = true;
-  try { localStorage.setItem('vortex-rift-unlocked', '1'); } catch (e) { /* ignore */ }
+  try { store.setItem('vortex-rift-unlocked', '1'); } catch (e) { /* ignore */ }
   applyRiftUnlock();
 }
 
@@ -3192,7 +3244,7 @@ function updateAimFromPointer(x, y) {
 const COCKPIT_TURN = 0.6;
 let viewMode = 'chase';
 let viewRot = 0;
-try { if (localStorage.getItem('vortex-view') === 'cockpit') viewMode = 'cockpit'; } catch (e) { /* ignore */ }
+try { if (store.getItem('vortex-view') === 'cockpit') viewMode = 'cockpit'; } catch (e) { /* ignore */ }
 
 function updateView(dt) {
   const target = viewMode === 'cockpit' && state === 'playing' ? COCKPIT_TURN * normalizeAngle(shipLane - Math.PI) : 0;
@@ -3409,7 +3461,7 @@ document.querySelectorAll('#difficulty button').forEach(btn => {
 // ---------- CRT overlay toggle (pure CSS scanlines/vignette/flicker) ----------
 let crtOn = true;
 try {
-  const saved = localStorage.getItem('vortex-crt');
+  const saved = store.getItem('vortex-crt');
   if (saved !== null) crtOn = saved === '1';
 } catch (e) { /* storage unavailable, keep the default */ }
 
@@ -3422,7 +3474,7 @@ function applyCrtState() {
 applyCrtState();
 
 // commander + briefing language (HUD and banners stay in arcade English)
-try { if (localStorage.getItem('vortex-lang') === 'es') lang = 'es'; } catch (e) { /* ignore */ }
+try { if (store.getItem('vortex-lang') === 'es') lang = 'es'; } catch (e) { /* ignore */ }
 function applyLang() {
   document.getElementById('langToggle').textContent = 'COMMS: ' + lang.toUpperCase();
   document.getElementById('viewToggle').textContent = 'VIEW: ' + viewMode.toUpperCase();
@@ -3432,20 +3484,20 @@ document.getElementById('viewToggle').addEventListener('click', (e) => {
   e.stopPropagation();
   viewMode = viewMode === 'chase' ? 'cockpit' : 'chase';
   applyLang();
-  try { localStorage.setItem('vortex-view', viewMode); } catch (err) { /* ignore */ }
+  try { store.setItem('vortex-view', viewMode); } catch (err) { /* ignore */ }
 });
 document.getElementById('langToggle').addEventListener('click', (e) => {
   e.stopPropagation();
   lang = lang === 'en' ? 'es' : 'en';
   applyLang();
-  try { localStorage.setItem('vortex-lang', lang); } catch (err) { /* ignore */ }
+  try { store.setItem('vortex-lang', lang); } catch (err) { /* ignore */ }
 });
 
 document.getElementById('crtToggle').addEventListener('click', (e) => {
   e.stopPropagation();
   crtOn = !crtOn;
   applyCrtState();
-  try { localStorage.setItem('vortex-crt', crtOn ? '1' : '0'); } catch (err) { /* ignore */ }
+  try { store.setItem('vortex-crt', crtOn ? '1' : '0'); } catch (err) { /* ignore */ }
 });
 
 function applySettingsUI() {
@@ -3502,7 +3554,7 @@ const ACHIEVEMENTS = {
   user:         { name: 'ROOT ACCESS',    how: 'BEAT THE CAMPAIGN' }
 };
 let achieved = {};
-try { achieved = JSON.parse(localStorage.getItem('vortex-achievements') || '{}') || {}; } catch (e) { achieved = {}; }
+try { achieved = JSON.parse(store.getItem('vortex-achievements') || '{}') || {}; } catch (e) { achieved = {}; }
 
 const SHIP_PALETTES = [
   { name: 'Violet',  main: '#e8d6ff', glow: '#a855ff' },
@@ -3525,7 +3577,7 @@ function paletteLock(i) {
 }
 let shipPaletteIndex = 0;
 try {
-  const savedP = localStorage.getItem('vortex-ship-palette');
+  const savedP = store.getItem('vortex-ship-palette');
   if (savedP !== null) {
     const idx = parseInt(savedP, 10);
     if (idx >= 0 && idx < SHIP_PALETTES.length && !paletteLock(idx)) shipPaletteIndex = idx;
@@ -3584,7 +3636,7 @@ const SHIP_CLASSES = [
 ];
 let shipClassIndex = 0;
 try {
-  const savedClass = parseInt(localStorage.getItem('vortex-ship-class'), 10);
+  const savedClass = parseInt(store.getItem('vortex-ship-class'), 10);
   if (savedClass >= 0 && savedClass < SHIP_CLASSES.length) shipClassIndex = savedClass;
 } catch (e) { /* storage unavailable, keep default */ }
 function shipClass() {
@@ -3619,7 +3671,7 @@ document.querySelectorAll('#shipclass button').forEach((btn, i) => {
     e.stopPropagation();
     shipClassIndex = i;
     applyShipClass();
-    try { localStorage.setItem('vortex-ship-class', String(i)); } catch (err) { /* ignore */ }
+    try { store.setItem('vortex-ship-class', String(i)); } catch (err) { /* ignore */ }
   });
 });
 
@@ -3633,7 +3685,7 @@ document.querySelectorAll('#shipcolor button').forEach((btn, i) => {
     }
     shipPaletteIndex = i;
     applyShipPalette();
-    try { localStorage.setItem('vortex-ship-palette', String(i)); } catch (err) { /* ignore */ }
+    try { store.setItem('vortex-ship-palette', String(i)); } catch (err) { /* ignore */ }
   });
 });
 
@@ -3659,7 +3711,7 @@ function nextToast() {
 function unlockAchievement(id) {
   if (achieved[id] || !ACHIEVEMENTS[id]) return;
   achieved[id] = true;
-  try { localStorage.setItem('vortex-achievements', JSON.stringify(achieved)); } catch (e) { /* ignore */ }
+  try { store.setItem('vortex-achievements', JSON.stringify(achieved)); } catch (e) { /* ignore */ }
   const a = ACHIEVEMENTS[id];
   showToast('ACHIEVEMENT: ' + a.name + (a.unlocks !== undefined ? '\nNEW SHIP COLOR: ' + SHIP_PALETTES[a.unlocks].name.toUpperCase() : ''));
   playPowerUp();
@@ -3770,11 +3822,11 @@ function rng(stream) {
   return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
 }
 function dailyBest() {
-  try { return parseInt(localStorage.getItem('vortex-daily-' + todayKey()), 10) || 0; } catch (e) { return 0; }
+  try { return parseInt(store.getItem('vortex-daily-' + todayKey()), 10) || 0; } catch (e) { return 0; }
 }
 function recordDaily() {
   if (!daily || score <= dailyBest()) return;
-  try { localStorage.setItem('vortex-daily-' + todayKey(), String(score)); } catch (e) { /* ignore */ }
+  try { store.setItem('vortex-daily-' + todayKey(), String(score)); } catch (e) { /* ignore */ }
 }
 function updateDailyBtn() {
   const best = dailyBest();
@@ -3822,13 +3874,13 @@ function showRank(elId, won) {
   return r;
 }
 
-// ---------- Best score / furthest run tracker (localStorage, title screen) ----------
+// ---------- Best score / furthest run tracker (saved, title screen) ----------
 let bestScore = 0;
 let bestRunTier = 0; // highest New-Game-Plus depth ever reached (0 = run 1)
 try {
-  const savedScore = localStorage.getItem('vortex-best-score');
+  const savedScore = store.getItem('vortex-best-score');
   if (savedScore !== null) bestScore = parseInt(savedScore, 10) || 0;
-  const savedRun = localStorage.getItem('vortex-best-run');
+  const savedRun = store.getItem('vortex-best-run');
   if (savedRun !== null) bestRunTier = parseInt(savedRun, 10) || 0;
 } catch (e) { /* storage unavailable, keep defaults */ }
 
@@ -3850,8 +3902,8 @@ function recordRunResult() {
     if (riftDepth > bestRiftDepth) bestRiftDepth = riftDepth;
     if (score > bestRiftScore) bestRiftScore = score;
     try {
-      localStorage.setItem('vortex-best-rift-depth', String(bestRiftDepth));
-      localStorage.setItem('vortex-best-rift-score', String(bestRiftScore));
+      store.setItem('vortex-best-rift-depth', String(bestRiftDepth));
+      store.setItem('vortex-best-rift-score', String(bestRiftScore));
     } catch (err) { /* ignore */ }
     updateBestTag();
     return;
@@ -3861,8 +3913,8 @@ function recordRunResult() {
   if (runTier > bestRunTier) { bestRunTier = runTier; changed = true; }
   if (changed) {
     try {
-      localStorage.setItem('vortex-best-score', String(bestScore));
-      localStorage.setItem('vortex-best-run', String(bestRunTier));
+      store.setItem('vortex-best-score', String(bestScore));
+      store.setItem('vortex-best-run', String(bestRunTier));
     } catch (err) { /* ignore */ }
     updateBestTag();
   }
@@ -4334,7 +4386,7 @@ faceSample.height = 48;
 const faceCtx = faceSample.getContext('2d', { willReadFrequently: true });
 let faceLum = new Float32Array(64 * 48);
 let faceSampledAt = -1;
-try { pilotName = (localStorage.getItem('vortex-pilot') || '').slice(0, 10); } catch (e) { /* ignore */ }
+try { pilotName = (store.getItem('vortex-pilot') || '').slice(0, 10); } catch (e) { /* ignore */ }
 document.getElementById('pilotname').value = pilotName;
 
 // refresh the 64x48 brightness map from the camera, or from the mask
@@ -4409,7 +4461,7 @@ function playerName() {
 async function jackIn() {
   const input = document.getElementById('pilotname');
   pilotName = input.value.trim().toUpperCase().replace(/[^A-Z0-9 ÑÜ_-]/g, '').slice(0, 10);
-  try { localStorage.setItem('vortex-pilot', pilotName); } catch (e) { /* ignore */ }
+  try { store.setItem('vortex-pilot', pilotName); } catch (e) { /* ignore */ }
   initAudio();
   if (!camVideo && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
     try {
@@ -6834,7 +6886,7 @@ function readPilotName() {
   const typed = document.getElementById('pilotname').value.trim().toUpperCase().replace(/[^A-Z0-9 ÑÜ_-]/g, '').slice(0, 10);
   if (typed) {
     pilotName = typed;
-    try { localStorage.setItem('vortex-pilot', pilotName); } catch (e) { /* ignore */ }
+    try { store.setItem('vortex-pilot', pilotName); } catch (e) { /* ignore */ }
   }
   return playerName();
 }
@@ -7423,7 +7475,7 @@ let tutorial = null; // { step, t, aimFrom, shots, kills, done }
 let tutorialDone = false;
 try {
   // pilots who already have a best score have played: don't make them sit it
-  tutorialDone = !!localStorage.getItem('vortex-tutorial') || !!localStorage.getItem('vortex-best-score');
+  tutorialDone = !!store.getItem('vortex-tutorial') || !!store.getItem('vortex-best-score');
 } catch (e) { /* ignore */ }
 
 function maybeStartTutorial() {
@@ -7511,7 +7563,7 @@ function stopTutorial(quiet) {
   if (!tutorial) return;
   tutorial = null;
   tutorialDone = true;
-  try { localStorage.setItem('vortex-tutorial', '1'); } catch (e) { /* ignore */ }
+  try { store.setItem('vortex-tutorial', '1'); } catch (e) { /* ignore */ }
   document.getElementById('coach').style.display = 'none';
   if (quiet || state !== 'playing') return;
   // the real level 1 starts clean: count, bomb and power back to normal

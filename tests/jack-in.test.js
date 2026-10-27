@@ -22,7 +22,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await p.waitForTimeout(600);
   ok(await ev(`getComputedStyle(document.getElementById('portrait')).display`) === 'block', 'HUD portrait shown');
   console.log('  comms:', await ev(`document.getElementById('commstext').textContent`));
-  ok(await ev('pilotName') === 'NEO Z' && await ev(`localStorage.getItem('vortex-pilot')`) === 'NEO Z', 'name saved');
+  ok(await ev('pilotName') === 'NEO Z' && await ev(`store.getItem('vortex-pilot')`) === 'NEO Z', 'name saved');
   await ev('briefingTimer = 0; damageShip(10)'); await p.waitForTimeout(150);
   await p.screenshot({ path: `${process.argv[2]}/portrait-${process.argv[3]}.png` });
   console.log('errors', JSON.stringify(errs));
