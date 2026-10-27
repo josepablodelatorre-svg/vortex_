@@ -123,6 +123,22 @@ heal 32 (of `HULL_MAX = 100`).
   commercial loudness, crossfaded via `setMusicTrack('garden'|
   'destruction')` on every state change (title/results vs gameplay).
 
+**Music-reactive visuals** — `initMusicAnalyser()` routes both music
+tracks through an `AnalyserNode`; `updateMusicMood(dt)` (called from
+`update()`) reads the mid band (pads/chords) into `musicSwell` and the high
+band (shimmer) into `musicShimmer`, each 0..1 against its own adaptive
+floor/ceiling (`normaliseBand`). The soundtrack is ambient with a constant
+bass drone, so this deliberately follows swells, not beats. Swell deepens
+the background tint and brightens spokes/rings; shimmer washes the rings
+toward cyan-white; `swellRings` drift in from the far wall more often the
+fuller the music is. **Only works over http(s)** (e.g. GitHub Pages or
+`python3 -m http.server`): on `file://` the analyser is skipped on purpose,
+because a cross-origin MediaElementSource outputs silence and would mute the
+music. The values then stay 0 and the game looks as it did before.
+
+**Sparks** — `burst()` particles start faster and slow down with drag in
+`update()`, drawn as streaks along their velocity instead of dots.
+
 **HUD** (`#hud`) — boxed panel, LVL/SCORE row, KILLS x/target, optional
 RUN n indicator (`#hudrun`, shown once `runTier > 0`), optional TRIPLE
 LASER countdown (`#hudtriple`), then HULL/BOSS bars on a shared label
