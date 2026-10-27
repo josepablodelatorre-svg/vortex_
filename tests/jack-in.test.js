@@ -11,7 +11,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await p.goto('http://127.0.0.1:8765/index.html'); await ev('localStorage.clear()'); await p.reload(); await p.waitForTimeout(300);
   await p.evaluate(() => showScreen('hangar'));
   await p.click('#pilotname');
-  await p.keyboard.type('neo z');
+  await p.keyboard.type('ada z');
   ok(await ev('state') === 'title', 'typing a name (with a space) does not start or zap');
   await p.click('#jackinBtn'); await p.waitForTimeout(1500);
   ok(await ev('state') === 'jackin', 'jack-in sequence running');
@@ -22,7 +22,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await p.waitForTimeout(600);
   ok(await ev(`getComputedStyle(document.getElementById('portrait')).display`) === 'block', 'HUD portrait shown');
   console.log('  comms:', await ev(`document.getElementById('commstext').textContent`));
-  ok(await ev('pilotName') === 'NEO Z' && await ev(`store.getItem('vortex-pilot')`) === 'NEO Z', 'name saved');
+  ok(await ev('pilotName') === 'ADA Z' && await ev(`store.getItem('vortex-pilot')`) === 'ADA Z', 'name saved');
   await ev('briefingTimer = 0; damageShip(10)'); await p.waitForTimeout(150);
   await p.screenshot({ path: `${process.argv[2]}/portrait-${process.argv[3]}.png` });
   console.log('errors', JSON.stringify(errs));

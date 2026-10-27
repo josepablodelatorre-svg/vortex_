@@ -139,7 +139,11 @@
 // otherwise PeerJS's free public server introduces the two devices.
 function peerOptions() {
   const m = /[?&]peerhost=([^&]+)/.exec(location.search);
-  if (!m) return { debug: 0 };
+  if (!m) return { debug: 0, config: { iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' }
+  ] } };
   const [host, port] = decodeURIComponent(m[1]).split(':');
   return { host, port: parseInt(port, 10) || 9000, path: '/', secure: false, debug: 0, config: { iceServers: [] } };
 }
@@ -189,24 +193,45 @@ function setMsg(text) {
   document.getElementById('msg').textContent = text;
 }
 
+// dropped links rejoin by themselves (the link server or wifi can blip);
+// after a few tries it's back to the JACK IN button
+const RETRY_DELAYS = [1000, 2000, 4000, 8000, 12000];
+let retries = 0;
+let joinedOnce = false;
+function retryLater(why) {
+  if (retries >= RETRY_DELAYS.length) {
+    document.getElementById('join').style.display = 'flex';
+    setMsg(why + ' TAP JACK IN TO TRY AGAIN.');
+    return;
+  }
+  setMsg('RECONNECTING (' + (retries + 1) + '/' + RETRY_DELAYS.length + ')...');
+  setTimeout(join, RETRY_DELAYS[retries++]);
+}
+
 function join() {
   if (!hostId) { setMsg('NO GAME TO JOIN: SCAN THE QR CODE ON THE GAME SCREEN'); return; }
   const name = document.getElementById('name').value.trim().toUpperCase().slice(0, 10) || 'GUNNER';
   savePilot(name);
   setMsg('CONNECTING...');
   if (peer) peer.destroy();
-  peer = new Peer(peerOptions());
-  peer.on('open', () => {
-    conn = peer.connect(hostId, { reliable: true });
-    conn.on('open', () => send({ t: 'hello', name }));
-    conn.on('data', onData);
-    conn.on('close', () => {
+  // events from a replaced peer/connection are ignored (destroying the old
+  // one fires its close, which must not start another retry)
+  const p = peer = new Peer(peerOptions());
+  p.on('open', () => {
+    const c = conn = p.connect(hostId, { reliable: true });
+    c.on('open', () => { retries = 0; joinedOnce = true; send({ t: 'hello', name }); });
+    c.on('data', onData);
+    c.on('close', () => {
+      if (leaving || c !== conn) return;
       document.getElementById('join').style.display = 'flex';
-      setMsg('DISCONNECTED. TAP JACK IN TO RECONNECT.');
+      retryLater('DISCONNECTED.');
     });
   });
-  peer.on('error', (err) => {
-    setMsg(err.type === 'peer-unavailable' ? 'GAME NOT FOUND. IS IT STILL OPEN?' : 'CONNECTION FAILED (' + err.type + ')');
+  p.on('error', (err) => {
+    if (p !== peer) return;
+    // a game that's gone stays gone; network and server trouble is retried
+    if (err.type === 'peer-unavailable' && !joinedOnce) { setMsg('GAME NOT FOUND. IS IT STILL OPEN?'); return; }
+    retryLater('CONNECTION FAILED (' + err.type + ').');
   });
 }
 
@@ -272,8 +297,9 @@ window.addEventListener('mouseup', stopFire);
 document.getElementById('zap').addEventListener('click', () => send({ t: 'zap' }));
 // heartbeat, so the host notices a pad that goes away
 setInterval(() => send({ t: 'ping' }), 1000);
-window.addEventListener('pagehide', () => send({ t: 'bye' }));
-document.getElementById('joinBtn').addEventListener('click', join);
+let leaving = false;
+window.addEventListener('pagehide', () => { leaving = true; send({ t: 'bye' }); });
+document.getElementById('joinBtn').addEventListener('click', () => { retries = 0; join(); });
 document.getElementById('name').addEventListener('keydown', (e) => { if (e.key === 'Enter') join(); });
 document.getElementById('name').value = savedPilot();
 if (!hostId) setMsg('OPEN THIS BY SCANNING THE QR CODE ON THE GAME SCREEN');

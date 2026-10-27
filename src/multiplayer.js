@@ -15,12 +15,44 @@ let netId = '';
 let coPlayers = []; // { conn, slot, name, color, aim, x, vx, lastFireMsg, fireCd }
 let netStateTimer = 0;
 
-// ?peerhost=host:port: use a self-hosted PeerJS server (local testing)
+// ?peerhost=host:port: use a self-hosted PeerJS server (local testing).
+// Otherwise PeerJS's free public server introduces the devices, with a few
+// public STUN servers so phones on mobile networks can find a route.
 function peerOptions() {
   const m = /[?&]peerhost=([^&]+)/.exec(location.search);
-  if (!m) return { debug: 0 };
+  if (!m) return { debug: 0, config: { iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' }
+  ] } };
   const [host, port] = decodeURIComponent(m[1]).split(':');
   return { host, port: parseInt(port, 10) || 9000, path: '/', secure: false, debug: 0, config: { iceServers: [] } };
+}
+
+// The free link server can drop or stall. Errors of these kinds are worth
+// another try (with growing gaps); anything else (a game that's gone, a
+// browser without WebRTC) is reported straight away.
+const NET_RETRYABLE = ['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected'];
+const NET_RETRY_DELAYS = [1500, 3000, 6000, 12000];
+let netRetry = 0;
+function netRetryDelay(err) {
+  if (!NET_RETRYABLE.includes(err.type) || netRetry >= NET_RETRY_DELAYS.length) return 0;
+  return NET_RETRY_DELAYS[netRetry++];
+}
+// a host whose link-server connection drops keeps its open links, but needs
+// its id back so new players can still find it: reconnect, same id/QR code
+function keepPeerReachable(peer, status) {
+  peer.on('disconnected', () => {
+    let n = 0;
+    const retry = () => {
+      if (peer.destroyed || !peer.disconnected) return;
+      status('RECONNECTING TO THE LINK SERVER...');
+      try { peer.reconnect(); } catch (e) { /* ignore */ }
+      if (++n < NET_RETRY_DELAYS.length) setTimeout(retry, NET_RETRY_DELAYS[n]);
+    };
+    setTimeout(retry, NET_RETRY_DELAYS[0]);
+  });
+  peer.on('open', () => { netRetry = 0; status(''); });
 }
 
 function padUrl() {
@@ -61,8 +93,19 @@ function openLobby() {
     renderLobby();
   });
   netPeer.on('connection', onPadConnection);
+  keepPeerReachable(netPeer, (msg) => { if (msg) document.getElementById('lobbylink').textContent = msg; else renderLobby(); });
   netPeer.on('error', (err) => {
     if (err.type === 'unavailable-id') { netPeer.destroy(); netPeer = null; openLobby(); return; }
+    const wait = netRetryDelay(err);
+    if (wait && !netId) {
+      // never got a link at all: start over with a fresh one
+      document.getElementById('lobbylink').textContent = 'LINK SERVER BUSY, RETRYING (' + netRetry + '/' + NET_RETRY_DELAYS.length + ')...';
+      netPeer.destroy();
+      netPeer = null;
+      setTimeout(() => { if (document.getElementById('lobby').style.display !== 'none') openLobby(); }, wait);
+      return;
+    }
+    if (wait) return; // a dropped link server: keepPeerReachable is on it
     document.getElementById('qrbox').textContent = 'LINK ERROR';
     document.getElementById('lobbylink').textContent = 'COULD NOT REACH THE LINK SERVER (' + err.type + ')';
   });
@@ -277,7 +320,8 @@ function openVersusLobby() {
 }
 
 // a guest who opened a ?versus= link: accept, then connect to the challenger
-function acceptVersus() {
+function acceptVersus(e) {
+  if (e) netRetry = 0; // a fresh tap, not a retry
   const name = readPilotName();
   initAudio();
   document.getElementById('lobbyAccept').style.display = 'none';
@@ -292,6 +336,13 @@ function acceptVersus() {
     });
   });
   peer.on('error', (err) => {
+    const wait = netRetryDelay(err);
+    if (wait && !vsConn) {
+      document.getElementById('lobbyplayers').textContent = 'LINK SERVER BUSY, RETRYING (' + netRetry + '/' + NET_RETRY_DELAYS.length + ')...';
+      peer.destroy();
+      setTimeout(() => acceptVersus(), wait);
+      return;
+    }
     document.getElementById('lobbyplayers').textContent = err.type === 'peer-unavailable'
       ? 'CHALLENGE NOT FOUND - IS THE OTHER SCREEN STILL OPEN?' : 'CONNECTION FAILED (' + err.type + ')';
   });
@@ -719,7 +770,8 @@ function hostCycles(conn, msg) {
 }
 
 // network: guest side
-function joinCycles() {
+function joinCycles(e) {
+  if (e) netRetry = 0; // a fresh tap, not a retry
   const name = readPilotName();
   initAudio();
   document.getElementById('lobbyAccept').style.display = 'none';
@@ -758,6 +810,13 @@ function joinCycles() {
     conn.on('close', () => { showToast('HOST LEFT THE BUS'); cyQuit(); });
   });
   peer.on('error', (err) => {
+    const wait = netRetryDelay(err);
+    if (wait && !cyConn) {
+      document.getElementById('lobbyplayers').textContent = 'LINK SERVER BUSY, RETRYING (' + netRetry + '/' + NET_RETRY_DELAYS.length + ')...';
+      peer.destroy();
+      setTimeout(() => joinCycles(), wait);
+      return;
+    }
     document.getElementById('lobbyplayers').textContent = err.type === 'peer-unavailable'
       ? 'BUS NOT FOUND - IS THE OTHER SCREEN STILL OPEN?' : 'CONNECTION FAILED (' + err.type + ')';
   });

@@ -18,13 +18,13 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(!!(await H('netId')) && (await H(`document.getElementById('qrbox').innerHTML`)).startsWith('<svg'), 'lobby opens with a QR code');
   await host.screenshot({ path: process.argv[2] + '/lobby.png' });
   await pad.goto(url); await pad.waitForTimeout(300);
-  await pad.fill('#name', 'trinity');
+  await pad.fill('#name', 'nova');
   await pad.click('#joinBtn');
   for (let i = 0; i < 80 && (await H('coPlayers.length')) === 0; i++) await host.waitForTimeout(100);
-  ok(await H('coPlayers.length') === 1 && await H('coPlayers[0].name') === 'TRINITY', 'phone joins as P2 TRINITY');
+  ok(await H('coPlayers.length') === 1 && await H('coPlayers[0].name') === 'NOVA', 'phone joins as P2 NOVA');
   await pad.waitForTimeout(500);
   ok(await P(`getComputedStyle(document.getElementById('join')).display`) === 'none', 'pad switches to the controller');
-  ok((await H(`document.getElementById('lobbyplayers').textContent`)).includes('TRINITY'), 'lobby lists the player');
+  ok((await H(`document.getElementById('lobbyplayers').textContent`)).includes('NOVA'), 'lobby lists the player');
   await host.click('#lobbyClose');
   await ((await host.evaluate("state === 'title'")) ? host.evaluate('startGame(false)') : host.mouse.click(500, 740)); await host.waitForTimeout(200);
   await H('briefingTimer = 0; hull = hullMax');
@@ -45,6 +45,15 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await pad.screenshot({ path: process.argv[2] + '/coop-pad.png' });
   await pad.click('#zap'); await host.waitForTimeout(400);
   ok(await H('zapperCharges') === 0, 'ZAP on the phone fires the team zapper');
+  // the host loses the link server: it reconnects and keeps the same link
+  const idBefore = await H('netId');
+  await H('netPeer.disconnect()');
+  const back = await host.waitForFunction('netPeer && !netPeer.disconnected', null, { timeout: 12000 }).then(() => true).catch(() => false);
+  ok(back && await H('netId') === idBefore, 'host reconnects to the link server with the same QR link');
+  // the phone's link drops: it rejoins by itself
+  await P('conn.close()');
+  const rejoined = await host.waitForFunction(() => coPlayers.length === 1 && coPlayers[0].conn.open, null, { timeout: 15000 }).then(() => true).catch(() => false);
+  ok(rejoined && await P(`getComputedStyle(document.getElementById('join')).display`) === 'none', 'a dropped phone rejoins automatically');
   await pad.close({ runBeforeUnload: true }); for (let i = 0; i < 80 && await H('coPlayers.length'); i++) await host.waitForTimeout(100);
   ok(await H('coPlayers.length') === 0, 'closing the pad removes the gunner');
   console.log('errors', JSON.stringify(errs));

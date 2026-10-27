@@ -321,7 +321,7 @@ document.getElementById('coopBtn').addEventListener('click', (e) => { e.stopProp
 document.getElementById('versusBtn').addEventListener('click', (e) => { e.stopPropagation(); openVersusLobby(); });
 document.getElementById('lobbyAccept').addEventListener('click', (e) => {
   e.stopPropagation();
-  if (lobbyKind === 'cyjoin') joinCycles(); else acceptVersus();
+  if (lobbyKind === 'cyjoin') joinCycles(e); else acceptVersus(e);
 });
 document.getElementById('cyclesBtn').addEventListener('click', (e) => { e.stopPropagation(); readPilotName(); lobbyKind = 'cycles'; openLobby(); });
 document.getElementById('lobbyStart').addEventListener('click', (e) => { e.stopPropagation(); startCycles(); });

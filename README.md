@@ -397,6 +397,18 @@ of inverting, the hoop trip is a slow gentle colour drift, screen flashes
 (level change, damage, teleport) are a quarter strength, shake is cut to a
 third, and the CRT and title flicker stop (`body.calm`).
 
+**Multiplayer reliability** — PeerJS's free public server introduces the
+devices (`peerOptions()` adds Google + Cloudflare STUN servers for mobile
+networks). Network/server errors are retried with growing gaps
+(`NET_RETRYABLE`, `NET_RETRY_DELAYS`, `netRetryDelay()`): a host that never
+got a link starts over, a host whose link-server connection drops
+reconnects with the same id so the QR code stays valid
+(`keepPeerReachable()`), and versus/Daemons guests retry joining.
+`pad.html` rejoins by itself when its link drops (`retryLater()`, up to
+five tries), ignoring events from connections it has replaced. For a
+public launch, run our own PeerJS server (and a TURN server for phones
+behind strict networks) and point `peerOptions()` at it.
+
 **Leaderboard** — top 10 per mode on this device (`boards`, saved as
 `vortex-leaderboard`): CAMPAIGN, RIFT and DAILY (today's tunnel only).
 Every finished run goes through `addToBoard()` from `recordRunResult()`
