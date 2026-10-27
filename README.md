@@ -399,15 +399,18 @@ There's no test suite, but this session's workflow for every change was:
    finishing-blow race condition where two bolts killing the boss in the
    same frame caused a null-dereference).
 
-**Title screen layout** — the main view is just logo, ship preview +
-class, name/JACK IN and PLAY; everything else sits in two drawers
-(`#titletabs`: MODES = daily/Rift/co-op/versus/Daemons, SETUP =
-difficulty/CRT/comms/colours). `body.inrun` (from `syncRunClass()`)
-hides the HUD outside runs. A `max-width: 600px / max-height: 500px`
-media query compacts everything for phones, moves the comms box to the
-top so it never covers the ship, and keeps HUD/ZAP clear of the notch
-(`viewport-fit=cover` + `env(safe-area-inset-*)`). Touch screens say TAP
-TO PLAY and drop the [SPACE] hint.
+**Start screens** — `#title` holds `.screen` sections switched by
+`showScreen(name)`: `splash` (logo, INFINITE SPACE. INFINITE WAR., any tap
+→ `titleTap()` → menu), `menu` (PLAY, DAILY TUNNEL, THE RIFT once
+unlocked, MULTIPLAYER / HANGAR / SETTINGS via `data-go`, plus a loadout
+line), `hangar` (ship preview, class, colour, achievements, name + JACK
+IN), `multi` (co-op, versus, Daemons) and `settings` (difficulty, CRT,
+comms language). Runs only start from PLAY/DAILY/RIFT/mode buttons;
+results screens have a MENU button (`backToMenu()`). `body.inrun` hides
+the HUD outside runs. A `max-width: 600px / max-height: 500px` media
+query compacts everything for phones, moves the comms box to the top so
+it never covers the ship, and keeps HUD/buttons clear of the notch
+(`viewport-fit=cover` + `env(safe-area-inset-*)`).
 
 ## Multiplayer
 
