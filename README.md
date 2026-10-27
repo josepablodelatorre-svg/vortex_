@@ -169,6 +169,34 @@ with the zapper still ready, enemies at close range, and not shooting for
 6s. `shipCallout()` floats big text from the ship (pickup names, "-16
 HULL"). Hidden whenever not playing.
 
+**Missions (from X, 1992)** — each campaign level has a `missionType`
+from `MISSION_TYPES` (rotating with `runTier`): `destroy` (KILL_TARGET
+kills), `recover` (shoot `RECOVER_TARGET` cyan data `cores` before they
+reach the rim) or `survive` (`SURVIVE_TIME` seconds against a swarm that
+spawns ~2× faster). `missionProgress()` 0..1 drives everything: minibosses
+at `MINIBOSS_THRESHOLDS` (now fractions 0.35/0.65), the boss once it hits 1,
+and the HUD row via `updateObjectiveUI()` (the one place that writes
+`#objlabel`/`#kills`/`#killTarget`). `startLevelMission()` (from
+`onLevelStart()`) shows the `#briefing` box for `BRIEFING_TIME`;
+`calmPhase()` (briefing or warp) pauses spawns and boss arming. The Rift
+is always destroy, with no briefing.
+
+**Radar (from X)** — `drawRadar()`, top-right: true lanes (no swirl/bank),
+centre = far, rim = at the ship; aim wedge, sweep, enemies (blink when
+close), boss, pickups, cores, bolts, spikes.
+
+**Music per situation** — `MUSIC_TRACKS` crossfaded by `setMusicTrack()`:
+garden (menus), destruction (campaign), rift (`nocherandom.mp3`), boss
+(`cuerpoacido.mp3`, restarted per fight, real bosses only).
+`gameplayTrack()` picks the mode's track. The two new files load lazily
+(`preload='none'`) and pause when faded out.
+
+**Comms language** — `#langToggle` (saved as `vortex-lang`) switches the
+commander and briefings to Spanish: `COMMS_ES` maps each English line to
+its Spanish one; newer lines are `{ en, es }` objects read via `L()`.
+`arcadeCaps()` drops accents on capitals because the pixel font draws
+them at lowercase height.
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups
