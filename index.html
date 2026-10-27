@@ -473,6 +473,52 @@
     text-shadow: 0 0 6px #ffe14d;
   }
   #dailyBtn.challenged { background: #ffe14d; color: #000; text-shadow: none; box-shadow: 0 0 14px #ffe14d; }
+  #versusBtn {
+    display: block;
+    margin: 10px auto 0;
+    background: transparent;
+    border: 1px solid #ff8c28;
+    color: #ff8c28;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 9px 12px;
+    cursor: pointer;
+    text-shadow: 0 0 6px #ff8c28;
+  }
+  #lobbyAccept {
+    display: none;
+    margin: 0 auto 14px;
+    background: #ff8c28;
+    border: none;
+    color: #000;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 12px 18px;
+    cursor: pointer;
+    box-shadow: 0 0 16px rgba(255, 140, 40, 0.6);
+  }
+  /* versus: the opponent's live hull + score, top centre */
+  #vspanel {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-size: 9px;
+    color: #ff8c28;
+    text-shadow: 0 0 6px #ff8c28;
+    background: rgba(10, 0, 24, 0.6);
+    border: 1px solid rgba(255, 140, 40, 0.5);
+    padding: 8px 12px;
+    z-index: 5;
+  }
+  #vshull { width: 90px; height: 8px; border: 1px solid #ff8c28; padding: 2px; }
+  #vshullfill { height: 100%; width: 100%; background: #ff8c28; }
   #coopBtn {
     display: block;
     margin: 10px auto 0;
@@ -744,6 +790,7 @@
   <button id="riftStart" class="riftBtn">ENTER THE RIFT</button>
   <button id="dailyBtn">DAILY TUNNEL</button>
   <button id="coopBtn">CO-OP: ADD PLAYERS</button>
+  <button id="versusBtn">VERSUS: CHALLENGE A FRIEND</button>
   <button id="crtToggle" class="selected">CRT: ON</button>
   <button id="langToggle">COMMS: EN</button>
   <div id="jackin">
@@ -776,12 +823,14 @@
 </div>
 <button id="zapBtn">ZAP</button>
 <div id="toast"></div>
+<div id="vspanel"><span id="vsname">VS</span><div id="vshull"><div id="vshullfill"></div></div><span id="vsscore">0</span></div>
 <div id="lobby">
   <h2>CO-OP LINK</h2>
   <p>SCAN WITH A PHONE TO JOIN AS AN EXTRA GUNNER (UP TO 3)</p>
   <div id="qrbox">STARTING LINK...</div>
   <p id="lobbylink"></p>
   <div id="lobbyplayers"></div>
+  <button id="lobbyAccept">ACCEPT CHALLENGE</button>
   <button id="lobbyClose">DONE</button>
 </div>
 <canvas id="digitize"></canvas>
@@ -789,17 +838,17 @@
 <div id="briefing"><div id="briefingtitle"></div><div id="briefingtext"></div></div>
 <div id="comms"><span id="commslabel">&gt; COMMAND</span><span id="commstext"></span></div>
 <div id="gameover">
-  <h1>SIGNAL LOST</h1>
+  <h1 id="losttitle">SIGNAL LOST</h1>
   <div class="rank" id="rankLost"></div>
   <p id="finalscore"></p>
-  <p>CLICK TO RETRY</p>
+  <p id="losthint">CLICK TO RETRY</p>
   <div class="resultBtns"><button class="clipBtn">SAVE CLIP</button><button class="shareBtn">SHARE</button></div>
 </div>
 <div id="cleared">
-  <h1>SIGNAL SECURED</h1>
+  <h1 id="wontitle">SIGNAL SECURED</h1>
   <div class="rank" id="rankWon"></div>
   <p id="clearedscore"></p>
-  <p>CLICK TO PUSH DEEPER</p>
+  <p id="wonhint">CLICK TO PUSH DEEPER</p>
   <button id="riftFromCleared" class="riftBtn">OR ENTER THE RIFT</button>
   <div class="resultBtns"><button class="clipBtn">SAVE CLIP</button><button class="shareBtn">SHARE</button></div>
 </div>
@@ -1463,7 +1512,7 @@ function enterRiftSector() {
   updateObjectiveUI();
   document.getElementById('levelnum').textContent = riftDepth;
   updateRunUI();
-  showLevelBanner(riftDepth === 1 ? 'THE RIFT' : 'DEPTH ' + riftDepth);
+  showLevelBanner(riftDepth === 1 ? (versus ? 'VERSUS' : 'THE RIFT') : 'DEPTH ' + riftDepth);
   if (riftDepth >= 5) unlockAchievement('riftwalker');
 }
 
@@ -2264,11 +2313,11 @@ function seedDaily() {
   rngStates = {};
 }
 function rng(stream) {
-  if (!daily) return Math.random();
+  if (!daily && !versus) return Math.random();
   stream = stream || 'misc';
   if (rngStates[stream] === undefined) {
     // seed = today's date mixed with the stream name
-    let h = parseInt(todayKey().replace(/-/g, ''), 10) >>> 0;
+    let h = versus ? vsSeed >>> 0 : parseInt(todayKey().replace(/-/g, ''), 10) >>> 0;
     for (const ch of stream) h = Math.imul(h ^ ch.charCodeAt(0), 2654435761) >>> 0;
     rngStates[stream] = h;
   }
@@ -2351,6 +2400,7 @@ function updateBestTag() {
 updateBestTag();
 
 function recordRunResult() {
+  if (versus) return; // versus scores don't count toward the solo records
   if (gameMode === 'rift') {
     // the Rift keeps its own records: its multiplied scores would swamp
     // the campaign's best score otherwise
@@ -2391,11 +2441,24 @@ function triggerShake(magnitude, duration) {
 // screen replays whichever mode was just lost; anything else is campaign.
 function startGame(continuing, mode) {
   // a daily run is a seeded campaign; retrying from its game over stays daily
+  // in a versus match, clicking the results screen asks for a rematch instead
+  if (versus && mode === undefined && (state === 'gameover' || state === 'cleared')) {
+    if (requestRematch()) return;
+  }
+  versus = mode === 'versus';
+  if (versus) { mode = 'rift'; vsKills = 0; vsIncoming = 0; }
   daily = mode === 'daily' || (mode === undefined && state === 'gameover' && daily);
   if (mode === 'daily') mode = 'campaign';
   if (mode === undefined) mode = state === 'gameover' ? gameMode : 'campaign';
-  if (daily) seedDaily();
+  if (daily || versus) seedDaily();
   runT = 0;
+  // results screens back to their normal wording
+  document.getElementById('wontitle').textContent = 'SIGNAL SECURED';
+  document.getElementById('wonhint').textContent = 'CLICK TO PUSH DEEPER';
+  document.getElementById('riftFromCleared').style.display = '';
+  document.getElementById('losttitle').textContent = 'SIGNAL LOST';
+  document.getElementById('losthint').textContent = 'CLICK TO RETRY';
+  document.getElementById('vspanel').style.display = versus ? 'flex' : 'none';
   stopClipRecorders();
   for (const btn of document.querySelectorAll('.clipBtn')) { btn.disabled = !clipSupported; btn.textContent = 'SAVE CLIP'; }
   for (const btn of document.querySelectorAll('.shareBtn')) btn.textContent = 'SHARE';
@@ -2471,7 +2534,9 @@ function startGame(continuing, mode) {
   comms = null;
   lastShotTime = t;
   killStreak = 0;
-  if (gameMode === 'rift') {
+  if (versus) {
+    say('vsStart', { en: 'VERSUS ' + vsName + '. LAST PROGRAM FLYING WINS.', es: 'CONTRA ' + vsName + '. GANA EL ULTIMO PROGRAMA EN PIE.' }, 3, 0);
+  } else if (gameMode === 'rift') {
     hack('riftHack', { en: 'WELCOME TO MY RIFT, PILOT. NOBODY LEAVES.', es: 'BIENVENIDO A MI GRIETA, PILOTO. NADIE SALE.' }, 3, 0);
   } else say('start', gameMode === 'rift'
     ? ["YOU'RE ON YOUR OWN OUT HERE, PILOT.", 'NO WAY BACK FROM THE RIFT. GOOD LUCK.']
@@ -2483,7 +2548,10 @@ function startGame(continuing, mode) {
 
 function updateRunUI() {
   const el = document.getElementById('hudrun');
-  if (gameMode === 'rift') {
+  if (versus) {
+    el.textContent = 'VERSUS  x' + riftMultiplier();
+    el.style.display = 'block';
+  } else if (gameMode === 'rift') {
     el.textContent = 'THE RIFT  x' + riftMultiplier();
     el.style.display = 'block';
   } else if (daily) {
@@ -2498,6 +2566,9 @@ function updateRunUI() {
 }
 
 function endGame() {
+  if (versus) {
+    vsSend({ t: 'vs-dead', score });
+  }
   // the ship de-rezzes into a big cloud of its own colour
   derez(CX + shipX, H - Math.min(W, H) * 0.11, hexToRgb(SHIP_PALETTES[shipPaletteIndex].main), 160, 2.5);
   shipDerezzed = true;
@@ -2506,9 +2577,15 @@ function endGame() {
   updateZapUI();
   recordRunResult();
   showRank('rankLost', false);
+  if (versus) {
+    document.getElementById('losttitle').textContent = 'DEFEATED';
+    document.getElementById('losthint').textContent = vsConn ? 'CLICK FOR A REMATCH' : 'CLICK TO RETRY';
+  }
   recordDaily();
   updateDailyBtn();
-  document.getElementById('finalscore').textContent = gameMode === 'rift'
+  document.getElementById('finalscore').textContent = versus
+    ? vsName + ' OUTLASTED YOU.  YOU ' + score
+    : gameMode === 'rift'
     ? 'SCORE: ' + score + '   DEPTH: ' + riftDepth
     : 'SCORE: ' + score + '   ' + objectiveParts()[0] + ': ' + objectiveParts()[1] + '/' + objectiveParts()[2];
   document.getElementById('gameover').style.display = 'block';
@@ -3027,6 +3104,7 @@ function triggerNova() {
     e.alive = false;
     score += Math.round((e.type === 'pentagram' ? 30 : 10) * (gameMode === 'rift' ? riftMultiplier() : 1));
     killCount += 1;
+    versusKill();
     burst(e.angle, e.z, { color: '255,120,255', bitColor: '#ff78ff', label: 'NOVA!', labelColor: '#ffb3ff' });
     derezAt(e.angle, e.z, (ENEMY_COLORS[e.type] || ENEMY_COLORS.drone).rgb, 10, 1 - e.z * 0.6);
   }
@@ -3453,6 +3531,7 @@ function update(dt) {
           score += Math.round((e.type === 'pentagram' ? 30 : 10) * (gameMode === 'rift' ? riftMultiplier() : 1));
           killCount += 1;
           killStreak += 1;
+          versusKill();
           if (killStreak > 0 && killStreak % 10 === 0) {
             shipCallout(killStreak + ' STREAK!', '#3f6');
             say('streak', ['NICE SHOOTING!', 'KEEP IT UP, PILOT!', 'THEY CANNOT TOUCH YOU!', 'OUTSTANDING!'], 2, 0);
@@ -3909,7 +3988,8 @@ const ENEMY_COLORS = {
   weaver:    { rgb: '255,120,60', hex: '#ff783c' },
   shooter:   { rgb: '60,190,255', hex: '#3cbeff' },
   grid:      { rgb: '220,255,60', hex: '#dcff3c' },
-  pentagram: { rgb: '255,20,50',  hex: '#ff1432' }
+  pentagram: { rgb: '255,20,50',  hex: '#ff1432' },
+  intruder:  { rgb: '255,60,220', hex: '#ff3cdc' } // sent by a versus opponent
 };
 
 function drawEnemies() {
@@ -4851,7 +4931,17 @@ function padUrl() {
 
 function openLobby() {
   document.getElementById('lobby').style.display = 'block';
+  const titles = {
+    coop: ['CO-OP LINK', 'SCAN WITH A PHONE TO JOIN AS AN EXTRA GUNNER (UP TO 3)'],
+    versus: ['VERSUS LINK', 'SCAN WITH ANOTHER DEVICE TO CHALLENGE IT. EACH SCREEN FLIES ITS OWN TUNNEL - LAST ONE FLYING WINS'],
+    join: ['VERSUS CHALLENGE', 'SOMEONE CHALLENGED YOU! TYPE YOUR NAME ON THE TITLE SCREEN OR JUST ACCEPT']
+  };
+  document.querySelector('#lobby h2').textContent = titles[lobbyKind][0];
+  document.querySelector('#lobby p').textContent = titles[lobbyKind][1];
+  document.getElementById('qrbox').style.display = lobbyKind === 'join' ? 'none' : 'inline-block';
+  document.getElementById('lobbyAccept').style.display = lobbyKind === 'join' ? 'block' : 'none';
   renderLobby();
+  if (lobbyKind === 'join') return;
   if (netPeer || typeof Peer === 'undefined') {
     if (typeof Peer === 'undefined') document.getElementById('qrbox').textContent = 'LINK UNAVAILABLE';
     return;
@@ -4872,13 +4962,23 @@ function openLobby() {
 
 function renderLobby() {
   const box = document.getElementById('qrbox');
+  if (lobbyKind === 'join') {
+    document.getElementById('lobbylink').textContent = '';
+    if (vsName) document.getElementById('lobbyplayers').textContent = 'LINKED WITH ' + vsName + '. GET READY...';
+    return;
+  }
+  const link = lobbyKind === 'versus' ? versusUrl() : padUrl();
   if (netId && typeof qrcode !== 'undefined') {
     const qr = qrcode(0, 'M');
-    qr.addData(padUrl());
+    qr.addData(link);
     qr.make();
     box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0 });
     box.style.lineHeight = '0';
-    document.getElementById('lobbylink').textContent = padUrl();
+    document.getElementById('lobbylink').textContent = link;
+  }
+  if (lobbyKind === 'versus') {
+    document.getElementById('lobbyplayers').textContent = vsName ? vsName + ' ACCEPTED! STARTING...' : 'WAITING FOR A CHALLENGER...';
+    return;
   }
   document.getElementById('lobbyplayers').innerHTML = coPlayers.length
     ? coPlayers.map(cp => `<span style="color:${cp.color}">P${cp.slot + 2} ${cp.name}</span>`).join('<br>')
@@ -4888,6 +4988,8 @@ function renderLobby() {
 function onPadConnection(conn) {
   conn.on('data', (msg) => {
     if (!msg || typeof msg !== 'object') return;
+    if (msg.t === 'vs-hello') { hostVersus(conn, msg); return; }
+    if (conn === vsConn) return; // versus traffic is handled in attachVersus
     let cp = coPlayers.find(c => c.conn === conn);
     if (msg.t === 'hello' && !cp) {
       const used = coPlayers.map(c => c.slot);
@@ -4979,6 +5081,229 @@ function drawCoPlayers() {
   }
 }
 
+// ---------- Versus (multiplayer stage 2) ----------
+// Two devices, each running its own tunnel. The challenger's screen shows a
+// QR code for index.html?versus=<id>; the other device opens it, accepts,
+// and both start the same seeded Rift-style endless run together. Every
+// VS_KILLS_PER_ATTACK kills sends a magenta intruder into the opponent's
+// tunnel; each side sees the other's hull and score live. Whoever
+// survives longer wins; then either side can call a rematch.
+const VS_KILLS_PER_ATTACK = 3;
+let versus = false;        // this run is a versus match
+let vsConn = null;
+let vsName = '';
+let vsKills = 0;
+let vsIncoming = 0;        // intruders still to spawn
+let vsIncomingTimer = 0;
+let vsLastSeen = 0;
+let vsStatusTimer = 0;
+let vsSeed = 0;
+let vsReady = { me: false, them: false };
+let vsCountdown = 0;
+let lobbyKind = 'coop';    // what the open lobby is for: 'coop' | 'versus' | 'join'
+const vsJoinId = (/[?&]versus=([^&]+)/.exec(location.search) || [])[1];
+
+function versusUrl() {
+  const url = new URL(location.href);
+  url.search = '';
+  url.searchParams.set('versus', netId);
+  const ph = /[?&]peerhost=([^&]+)/.exec(location.search);
+  if (ph) url.searchParams.set('peerhost', decodeURIComponent(ph[1]));
+  return url.toString();
+}
+
+function vsSend(msg) {
+  if (vsConn && vsConn.open) vsConn.send(msg);
+}
+
+// wire up a versus connection (either side) once it's open
+function attachVersus(conn) {
+  vsConn = conn;
+  vsLastSeen = t;
+  conn.on('data', (msg) => {
+    if (!msg || typeof msg !== 'object' || conn !== vsConn) return;
+    vsLastSeen = t;
+    if (msg.t === 'vs-welcome') {
+      vsName = msg.name;
+      vsSeed = msg.seed;
+      renderLobby();
+    } else if (msg.t === 'vs-go') {
+      vsSeed = msg.seed;
+      beginVersusCountdown();
+    } else if (msg.t === 'vs-status') {
+      updateVsPanel(msg);
+    } else if (msg.t === 'vs-attack') {
+      vsIncoming += msg.n;
+      say('vsAttack', { en: 'INCOMING FROM ' + vsName + '! INTRUDERS IN THE TUNNEL!', es: '¡ATAQUE DE ' + vsName + '! ¡INTRUSOS EN EL TUNEL!' }, 2, 6);
+    } else if (msg.t === 'vs-dead') {
+      if (state === 'playing' && versus) versusWin(msg.score);
+    } else if (msg.t === 'vs-rematch') {
+      vsReady.them = true;
+      document.getElementById(state === 'cleared' ? 'wonhint' : 'losthint').textContent =
+        vsReady.me ? 'STARTING...' : vsName + ' WANTS A REMATCH - CLICK!';
+      maybeRematch();
+    }
+  });
+  conn.on('close', () => { if (conn === vsConn) versusOpponentGone(); });
+}
+
+// take the name typed on the title screen (also used without jacking in)
+function readPilotName() {
+  const typed = document.getElementById('pilotname').value.trim().toUpperCase().replace(/[^A-Z0-9 ÑÜ_-]/g, '').slice(0, 10);
+  if (typed) {
+    pilotName = typed;
+    try { localStorage.setItem('vortex-pilot', pilotName); } catch (e) { /* ignore */ }
+  }
+  return playerName();
+}
+
+function openVersusLobby() {
+  readPilotName();
+  lobbyKind = 'versus';
+  openLobby();
+}
+
+// a guest who opened a ?versus= link: accept, then connect to the challenger
+function acceptVersus() {
+  const name = readPilotName();
+  initAudio();
+  document.getElementById('lobbyAccept').style.display = 'none';
+  document.getElementById('lobbyplayers').textContent = 'CONNECTING...';
+  const peer = new Peer(peerOptions());
+  netPeer = peer;
+  peer.on('open', () => {
+    const conn = peer.connect(vsJoinId, { reliable: true });
+    conn.on('open', () => {
+      attachVersus(conn);
+      conn.send({ t: 'vs-hello', name });
+    });
+  });
+  peer.on('error', (err) => {
+    document.getElementById('lobbyplayers').textContent = err.type === 'peer-unavailable'
+      ? 'CHALLENGE NOT FOUND - IS THE OTHER SCREEN STILL OPEN?' : 'CONNECTION FAILED (' + err.type + ')';
+  });
+}
+
+// the challenger's side of a new versus connection
+function hostVersus(conn, msg) {
+  if (vsConn && vsConn.open) { conn.send({ t: 'vs-busy' }); return; }
+  vsName = String(msg.name || 'RIVAL').toUpperCase().replace(/[^A-Z0-9 ÑÜ_-]/g, '').slice(0, 10) || 'RIVAL';
+  attachVersus(conn);
+  vsSeed = (Math.random() * 4294967296) >>> 0;
+  conn.send({ t: 'vs-welcome', name: playerName(), seed: vsSeed });
+  showToast(vsName + ' ACCEPTED YOUR CHALLENGE');
+  renderLobby();
+  // give both screens a moment, then start together
+  setTimeout(() => {
+    vsSend({ t: 'vs-go', seed: vsSeed });
+    beginVersusCountdown();
+  }, 1200);
+}
+
+function beginVersusCountdown() {
+  document.getElementById('lobby').style.display = 'none';
+  vsReady = { me: false, them: false };
+  vsCountdown = 3.5;
+  document.getElementById('title').style.display = 'none';
+  document.getElementById('gameover').style.display = 'none';
+  document.getElementById('cleared').style.display = 'none';
+  state = 'countdown';
+}
+
+function updateVersus(dt) {
+  if (state === 'countdown') {
+    const before = Math.ceil(vsCountdown);
+    vsCountdown -= dt;
+    if (Math.ceil(vsCountdown) !== before && vsCountdown > 0) {
+      showLevelBanner(String(Math.ceil(vsCountdown)) + ' - VS ' + vsName);
+      playBass(90, 0.15);
+    }
+    if (vsCountdown <= 0) {
+      state = 'title';
+      startGame(false, 'versus');
+    }
+    return;
+  }
+  if (!vsConn) return;
+  // silence for 6s (closed tab, lost signal) counts as leaving
+  if (t - vsLastSeen > 6 && vsConn.open) { vsSend({ t: 'vs-ping' }); }
+  if (t - vsLastSeen > 8) { versusOpponentGone(); return; }
+  vsStatusTimer -= dt;
+  if (vsStatusTimer <= 0) {
+    vsStatusTimer = 0.25;
+    vsSend({ t: 'vs-status', hull: Math.max(0, hull / hullMax), score, depth: riftDepth, st: state });
+  }
+  if (state === 'playing' && versus && vsIncoming > 0) {
+    vsIncomingTimer -= dt;
+    if (vsIncomingTimer <= 0) {
+      vsIncoming -= 1;
+      vsIncomingTimer = 0.45;
+      const angle = normalizeAngle(Math.random() * Math.PI * 2);
+      enemies.push({ angle, z: 1, shape: 'ring', type: 'intruder', alive: true, baseAngle: angle, phase: 0,
+                     speed: getDiffParams().speedBase * 1.6 });
+    }
+  }
+}
+
+function updateVsPanel(msg) {
+  document.getElementById('vsname').textContent = 'VS ' + vsName;
+  document.getElementById('vsscore').textContent = msg.score;
+  document.getElementById('vshullfill').style.width = Math.max(0, msg.hull * 100) + '%';
+}
+
+// called on every kill during a versus run
+function versusKill() {
+  if (!versus) return;
+  vsKills += 1;
+  if (vsKills % VS_KILLS_PER_ATTACK === 0) {
+    vsSend({ t: 'vs-attack', n: 1 });
+    shipCallout('ATTACK SENT!', '#ff8c28');
+  }
+}
+
+function versusWin(theirScore) {
+  versus = true;
+  state = 'cleared';
+  updateZapUI();
+  document.getElementById('briefing').style.opacity = '0';
+  document.getElementById('wontitle').textContent = 'VICTORY';
+  document.getElementById('clearedscore').textContent = 'YOU ' + score + '  -  ' + vsName + ' ' + (theirScore || 0);
+  document.getElementById('wonhint').textContent = 'CLICK FOR A REMATCH';
+  document.getElementById('riftFromCleared').style.display = 'none';
+  showRank('rankWon', true);
+  document.getElementById('cleared').style.display = 'block';
+  setMusicTrack('garden');
+}
+
+function versusOpponentGone() {
+  const wasPlaying = state === 'playing' && versus;
+  vsConn = null;
+  document.getElementById('vspanel').style.display = 'none';
+  showToast((vsName || 'OPPONENT') + ' DISCONNECTED');
+  if (wasPlaying) versusWin(0);
+  versus = false;
+}
+
+function requestRematch() {
+  if (!vsConn || !vsConn.open) { versus = false; return false; }
+  vsReady.me = true;
+  vsSend({ t: 'vs-rematch' });
+  document.getElementById(state === 'cleared' ? 'wonhint' : 'losthint').textContent =
+    vsReady.them ? 'STARTING...' : 'WAITING FOR ' + vsName + '...';
+  maybeRematch();
+  return true;
+}
+
+function maybeRematch() {
+  if (!vsReady.me || !vsReady.them) return;
+  // the challenger picks the new seed
+  if (!vsJoinId) {
+    vsSeed = (Math.random() * 4294967296) >>> 0;
+    vsSend({ t: 'vs-go', seed: vsSeed });
+    beginVersusCountdown();
+  }
+}
+
 // daily tunnel, clip and share buttons (wired last: they use the sections above)
 updateDailyBtn();
 document.getElementById('dailyBtn').addEventListener('click', (e) => {
@@ -4997,7 +5322,14 @@ for (const btn of document.querySelectorAll('.clipBtn')) {
 for (const btn of document.querySelectorAll('.shareBtn')) {
   btn.addEventListener('click', (e) => { e.stopPropagation(); shareResult(btn); });
 }
-document.getElementById('coopBtn').addEventListener('click', (e) => { e.stopPropagation(); openLobby(); });
+document.getElementById('coopBtn').addEventListener('click', (e) => { e.stopPropagation(); lobbyKind = 'coop'; openLobby(); });
+document.getElementById('versusBtn').addEventListener('click', (e) => { e.stopPropagation(); openVersusLobby(); });
+document.getElementById('lobbyAccept').addEventListener('click', (e) => { e.stopPropagation(); acceptVersus(); });
+// opened from a versus QR code: go straight to the challenge screen
+if (vsJoinId) {
+  lobbyKind = 'join';
+  openLobby();
+}
 for (const ev of ['click', 'mousedown', 'touchstart']) {
   document.getElementById('lobby').addEventListener(ev, (e) => e.stopPropagation());
 }
@@ -5027,6 +5359,7 @@ function loop(now) {
   draw();
   updateJackIn(dt);
   updateCoPlayers(dt);
+  updateVersus(dt);
   drawPortrait();
   updateClipRecording(dt);
   if (state === 'title') drawShipPreview();

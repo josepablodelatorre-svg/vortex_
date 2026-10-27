@@ -395,6 +395,20 @@ free public server introduces the devices; after that they talk directly
 a TURN relay. For local testing, add `?peerhost=127.0.0.1:9000` to point at
 a self-hosted `peer` server (it's passed on to the pad link).
 
+**Versus (stage 2)** — VERSUS: CHALLENGE A FRIEND opens the lobby with a
+QR code for `index.html?versus=<id>`; opening it shows ACCEPT CHALLENGE
+(`acceptVersus()`), the challenger replies (`hostVersus()`) with its name
+and a random `vsSeed`, then both screens run a 3s `'countdown'` state and
+`startGame(false, 'versus')`: a Rift-style endless run (`gameMode
+'rift'` + `versus = true`) seeded with `vsSeed` through `rng()`, so both
+start on the same waves. Every `VS_KILLS_PER_ATTACK` kills (`versusKill()`)
+sends `vs-attack`, which spawns a fast magenta `intruder` on the other
+side. `#vspanel` shows the rival's hull/score from `vs-status` (4/s, which
+doubles as the heartbeat: 8s of silence = forfeit). Dying sends `vs-dead`;
+the survivor gets VICTORY (`versusWin()`), the other DEFEATED, and clicking
+either asks for a rematch (both must click). Versus scores don't touch the
+solo records.
+
 ## Ideas discussed but not yet built
 
 From comparing notes against Vecter (Steam), linefire/VectorSwarm, and a
