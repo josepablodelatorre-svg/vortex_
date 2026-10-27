@@ -136,6 +136,28 @@ within the bolt hit tolerance of the aim; `drawBullseye()` puts a rotating
 red lock-on on it, or a faint purple bullseye out along the dotted firing
 line when nothing is in line.
 
+**Ship classes (from Spectre)** — `SHIP_CLASSES` (VIPER balanced 150
+hull; INTERCEPTOR 110 hull, faster bolts, hold-to-fire via `pointerHeld`;
+TANK 230 hull, slow bolts, bigger; GUNNER 130 hull, triple laser at every
+level start and 1.5× triple pickups), picked on the title screen
+(`#shipclass`, saved as `vortex-ship-class`). `hullMax` replaces the old
+fixed `HULL_MAX` everywhere the hull is filled or drawn; `HULL_MAX` is now
+just the VIPER default.
+
+**Superzapper (from Tempest)** — one per level (`zapperCharges`, refilled
+by `onLevelStart()`), fired with SPACE, right-click or `#zapBtn`
+(bottom-right, for touch). `superzap()` reuses `triggerNova()` and knocks
+the boss back to `BOSS_RESET_Z`. HUD line `#hudzap`.
+
+**Warp (from Tempest)** — beating a level boss (or a Rift boss gate)
+calls `startWarp(banner)` instead of showing the level banner: for
+`WARP_DURATION` the tunnel speeds up (`warpBoost()`, ×7 at peak; ring
+scroll now integrates `tunnelTravel` so speed changes don't jump), enemy
+and power-up spawns pause, star streaks race past and green `spikes`
+rush in along the walls. A spike reaching the rim within 0.35 rad of the
+aim hits for `SPIKE_DAMAGE`; bolts can shoot them. `finishWarp()` shows
+the next level's banner and calls `onLevelStart()`.
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups
