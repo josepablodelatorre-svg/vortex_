@@ -125,6 +125,8 @@ body:not(.inrun) #hud { display: none !important; }
 #plasmafill.over { background: #e8fdff; box-shadow: 0 0 10px #50e6ff; }
 /* cockpit view draws hull, plasma and power on the dashboard */
 body.cockpitview #hud { display: none; } /* the dashboard shows it all */
+/* in-run buttons never show on the title screens */
+body:not(.inrun) #zapBtn, body:not(.inrun) #lockBtn { display: none !important; }
 /* cockpit: the overlays move inside the glass, clear of the dashboard
    (--cp-dash / --cp-side / --cp-top come from cockpitLayout()) */
 body.cockpitview #comms { left: calc(var(--cp-side) + 10px); right: auto; bottom: calc(var(--cp-dash) + 10px); }

@@ -8,6 +8,9 @@
 // mode: 'campaign' | 'rift'. When omitted, retrying from the game-over
 // screen replays whichever mode was just lost; anything else is campaign.
 function startGame(continuing, mode) {
+  // first game ever: the photosensitivity notice comes first (not in a
+  // versus match, which the other player has already started)
+  if (needsFlashWarning() && mode !== 'versus') { askFlashWarning(() => startGame(continuing, mode)); return; }
   // a daily run is a seeded campaign; retrying from its game over stays daily
   // in a versus match, clicking the results screen asks for a rematch instead
   if (versus && mode === undefined && (state === 'gameover' || state === 'cleared')) {

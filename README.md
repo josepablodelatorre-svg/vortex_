@@ -386,13 +386,26 @@ wrapped so one flag (`glowActive`) zeroes it everywhere, and on AUTO
 own gain node (`sfxOut()`). `vibrate()` buzzes on hits, bombs and boss
 kills (Android; iPhones have no web vibration).
 
-**Flashing / photosensitivity** — first launch shows a photosensitivity
-warning (`#flashwarn`, EN + ES) with REDUCED FLASHING or CONTINUE; it's
-remembered (`vortex-flash-warned`). SETTINGS → FLASHING: FULL / REDUCED
+**Flashing / photosensitivity** — the first time a game is about to start
+(after the title screens, before any gameplay) a photosensitivity warning
+appears (`#flashwarn`, EN + ES) with REDUCED FLASHING or CONTINUE;
+`startGame()` / `continueFromCheckpoint()` call `askFlashWarning(then)` and
+carry on once it's answered. Not in versus (the other player already
+started). Remembered as `vortex-flash-warned`. SETTINGS → FLASHING: FULL / REDUCED
 (`settings.flash`, `flashScale()`). Reduced: the warp fades to grey instead
 of inverting, the hoop trip is a slow gentle colour drift, screen flashes
 (level change, damage, teleport) are a quarter strength, shake is cut to a
 third, and the CRT and title flicker stop (`body.calm`).
+
+**Install + offline** — `manifest.webmanifest` (fullscreen, icons in
+`img/icons/`, drawn by script in the game's style) makes VORTEX installable
+to a phone's home screen ("Add to Home Screen" on iPhone, the install
+prompt on Android/desktop Chrome). `sw.js` caches the game's files and
+serves them network-first (so new versions arrive whenever online, the
+cached copy when not). Music is streamed; each track is cached in the
+background the first time it plays, so offline sessions have whatever has
+been heard before. Multiplayer needs the network. Registered only over
+http(s); opening `index.html` from disk still works without it.
 
 **Pause** — P / Esc / the II button under the radar (`pauseGame()` /
 `resumeGame()`); the game also pauses itself on `visibilitychange` and

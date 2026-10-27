@@ -7,14 +7,20 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   const ev = (x) => p.evaluate(x);
   await p.goto('http://127.0.0.1:8765/index.html'); await ev('localStorage.clear()'); await p.reload(); await p.waitForTimeout(300);
-  // first launch: the warning covers everything until answered
-  ok(await p.isVisible('#flashwarn'), 'first launch shows the photosensitivity warning');
+  // the title comes first; the warning appears when a game is about to start
+  ok(!(await p.isVisible('#flashwarn')) && await ev('state') === 'title', 'the title screen shows first, no warning yet');
+  await ev(`showScreen('menu')`); await p.click('#playBtn');
+  ok(await p.isVisible('#flashwarn') && await ev('state') === 'title', 'pressing PLAY shows the photosensitivity warning before any gameplay');
   await p.screenshot({ path: process.argv[2] + '/flashwarn.png' });
   await p.click('#warnReduce');
   ok(!(await p.isVisible('#flashwarn')) && await ev(`settings.flash`) === 'reduced', 'REDUCED FLASHING closes it and turns the option on');
+  ok(await ev('state') === 'playing', 'and the game then starts');
+  await ev('backToMenu()');
   ok(await ev(`document.body.classList.contains('calm')`), 'calm mode stops the CRT and title flicker');
   await p.reload(); await p.waitForTimeout(300);
-  ok(!(await p.isVisible('#flashwarn')), 'the warning only shows once');
+  await ev('startGame(false)');
+  ok(!(await p.isVisible('#flashwarn')) && await ev('state') === 'playing', 'the warning only shows once');
+  await ev('backToMenu()');
   // reduced: the warp greys out instead of inverting, flashes and shake are toned down
   await ev(`startGame(false); briefingTimer = 0; startWarp('TEST')`); await p.waitForTimeout(600);
   const f = await ev('canvas.style.filter');

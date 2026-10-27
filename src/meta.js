@@ -66,15 +66,27 @@ document.getElementById('flashToggle').addEventListener('click', (e) => {
   applySettingsUI();
   saveSettings();
 });
-// first launch: the photosensitivity notice, before anything flashes
+// the photosensitivity notice: shown once, after the title screens, the
+// first time a game is about to start (before anything in play flashes).
+// askFlashWarning(then) shows it and runs `then` once it's answered.
+let afterFlashWarning = null;
+function needsFlashWarning() {
+  return !store.getItem('vortex-flash-warned');
+}
+function askFlashWarning(then) {
+  afterFlashWarning = then;
+  document.getElementById('flashwarn').classList.add('on');
+}
 function closeFlashWarning(reduce) {
   if (reduce) settings.flash = 'reduced';
   saveSettings();
   try { store.setItem('vortex-flash-warned', '1'); } catch (err) { /* ignore */ }
   applySettingsUI();
   document.getElementById('flashwarn').classList.remove('on');
+  const then = afterFlashWarning;
+  afterFlashWarning = null;
+  if (then) then();
 }
-if (!store.getItem('vortex-flash-warned')) document.getElementById('flashwarn').classList.add('on');
 for (const [id, reduce] of [['warnOk', false], ['warnReduce', true]]) {
   document.getElementById(id).addEventListener('click', (e) => { e.stopPropagation(); closeFlashWarning(reduce); });
 }

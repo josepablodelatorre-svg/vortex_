@@ -480,6 +480,7 @@ function checkpointLabel() {
 
 function continueFromCheckpoint() {
   if (!checkpoint) return;
+  if (needsFlashWarning()) { askFlashWarning(continueFromCheckpoint); return; }
   const cp = checkpoint;
   initAudio();
   startGame(false, 'campaign');

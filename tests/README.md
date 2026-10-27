@@ -32,6 +32,7 @@ port it is reused. Screenshots land in `tests/shots/` (not committed).
 | `settings` | glow modes and AUTO, volume sliders, vibration, saved settings |
 | `save` | old keys folded into the one versioned save, reload, corrupt save, pad |
 | `flashing` | photosensitivity warning, reduced flashing effects, settings toggle |
+| `install` | manifest + icons, service worker caching, loads and plays offline |
 | `pause` | P / Esc / button, auto-pause when hidden, MENU, no pause in versus |
 | `ship-classes` | class choice, hulls, bombs, warp spikes, gunner + interceptor perks |
 | `powerups` | shield, nova, ship movement, bullseye lock, pickup mix |
