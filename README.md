@@ -211,16 +211,16 @@ lane as lime `echo` bolts, fired by two lime ghost ships
 bright yellow and thicker; a lock turns the bullseye white-hot with a red
 centre and ticks.
 
-**Tron layer** — `derez()`/`derezAt()` burst wireframe voxel cubes
-(`voxels`, updated on every screen so the ship's own `endGame()` de-rez
-plays out under SIGNAL LOST; `shipDerezzed` hides the ship). Enemies,
-nova kills and bosses all de-rez. `CIRCUIT_TRACES` are fixed seeded
+**Cyber layer** — `shatter()`/`shatterAt()` burst wireframe voxel cubes
+(`voxels`, updated on every screen so the ship's own `endGame()` shatter
+plays out under SIGNAL LOST; `shipShattered` hides the ship). Enemies,
+nova kills and bosses all shatter. `CIRCUIT_TRACES` are fixed seeded
 circuit traces on the walls in (angle, z) space, with `circuitPulses`
 racing along them toward the horizon (more often as `musicSwell` rises,
 faster in a warp). `drawAimTrail()` draws the last 0.5s of the aim's path
-as a light-cycle ribbon around the tunnel.
+as a light-racer ribbon around the tunnel.
 
-**Jack in (from Tron)** — title-screen name field (`#pilotname`, saved as
+**Jack in** — title-screen name field (`#pilotname`, saved as
 `vortex-pilot`) + `#jackinBtn`. `jackIn()` asks for the camera (optional;
 refusal or no camera falls back to a procedural mask), then runs the
 `'jackin'` state: `updateJackIn()` draws a red laser sweeping down the
@@ -231,22 +231,22 @@ While playing, `drawPortrait()` shows the live wireframe in `#portrait`
 (red glitch when hit). The camera image never leaves the device. The
 commander's lines swap PILOT/PILOTO for the name.
 
-**Identity disc** — `disc` pickup sets `discCharges = DISC_THROWS` (3);
+**Lambda disc** — `disc` pickup sets `discCharges = DISC_THROWS` (3);
 while charged, `fire()` calls `throwDisc()` instead of shooting (when no
 disc is in flight). `updateDisc()` flies it out to z 0.5, sweeps one full
 turn of the ring, then flies it back; every enemy (and the boss) it
 touches gets one hit per throw by spawning a `hidden` bolt on it, so all
 hit/kill/score logic stays in the normal bolt collision code.
 
-**Recognizer** — `spawnBoss()` sets `boss.form = 'recognizer'` for level
-2's boss and every 6th Rift depth: drawn by `drawRecognizer()` (legs, bar,
+**Watchdog** — `spawnBoss()` sets `boss.form = 'watchdog'` for level
+2's boss and every 6th Rift depth: drawn by `drawWatchdog()` (legs, bar,
 head, slit eye), it sways around the tube and stomps forward
 (`stompTimer`/`lunge`), its eye flaring white just before.
 
 **OVERSEER** — the rival AI. `hack(key, lines, …)` sends a line through
 `say()` and marks it `comms.hack`: the box turns red, signs as
 `> OVERSEER`, glitches characters and plays `playHack()`. Breaks in for
-Recognizers, the final boss, the Rift, very low hull and (half the time)
+Watchdogs, the final boss, the Rift, very low hull and (half the time)
 on arriving in a new level, where it replaces the commander's line.
 
 **Ranks** — `runRank(won)` grades each run S–D from progress (55),
@@ -255,7 +255,7 @@ accuracy `runHits/runShots` of real bolts (25) and damage taken (20);
 
 **Achievements** — `ACHIEVEMENTS` (8), saved in `vortex-achievements`;
 `unlockAchievement(id)` shows a `#toast`. Four unlock extra
-`SHIP_PALETTES` (4–7: Ice, Toxic, Sunset, Sark); `paletteLock(i)` keeps
+`SHIP_PALETTES` (4–7: Ice, Toxic, Sunset, Inferno); `paletteLock(i)` keeps
 them dashed and unselectable until earned. Counter under the ship picker.
 
 **Save clip** — all audio now goes through `audioOut()` (one master gain
@@ -377,6 +377,16 @@ There's no test suite, but this session's workflow for every change was:
    finishing-blow race condition where two bolts killing the boss in the
    same frame caused a null-dereference).
 
+**Title screen layout** — the main view is just logo, ship preview +
+class, name/JACK IN and PLAY; everything else sits in two drawers
+(`#titletabs`: MODES = daily/Rift/co-op/versus/Daemons, SETUP =
+difficulty/CRT/comms/colours). `body.inrun` (from `syncRunClass()`)
+hides the HUD outside runs. A `max-width: 600px / max-height: 500px`
+media query compacts everything for phones, moves the comms box to the
+top so it never covers the ship, and keeps HUD/ZAP clear of the notch
+(`viewport-fit=cover` + `env(safe-area-inset-*)`). Touch screens say TAP
+TO PLAY and drop the [SPACE] hint.
+
 ## Multiplayer
 
 **Co-op link (stage 1)** — CO-OP: ADD PLAYERS opens `#lobby`: the game
@@ -409,14 +419,14 @@ the survivor gets VICTORY (`versusWin()`), the other DEFEATED, and clicking
 either asks for a rematch (both must click). Versus scores don't touch the
 solo records.
 
-**Light cycles (stage 3)** — LIGHT CYCLES opens a lobby (QR for
+**Daemons (stage 3)** — DAEMONS opens a lobby (QR for
 `index.html?cycles=<id>`) with START ROUND. The visible tunnel becomes a
 `CY_N`×`CY_M` grid on the tube wall (`cyPoint()` maps cells through
 `pointOnRing(..., { visual: false })`). Up to 4 riders (you, a joined
-friend, AI `PROGRAM`s for the rest) move one cell per `CY_TICK`, turn 90°
+friend, AI daemons from `DAEMON_NAMES` for the rest) move one cell per `CY_TICK`, turn 90°
 in their own frame (left/right arrows or A/D, mouse buttons, tap screen
 halves) and leave walls in `cyGrid`; walls, the rim and the far edge
-de-rez you, and a crashed rider's wall clears 1.2s later. Last one alive
+shatter you, and a crashed rider's wall clears 1.2s later. Last one alive
 wins; click for the next round, ESC for the menu. Host-authoritative: the
 host runs `cyStep()` and sends `cy-start` / `cy-tick` / `cy-end`; the
 guest only sends `cy-turn` / `cy-again`.
