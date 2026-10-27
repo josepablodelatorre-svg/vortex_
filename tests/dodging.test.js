@@ -3,6 +3,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1000, height: 720 } });
+  await p.addInitScript(() => localStorage.setItem('vortex-tutorial', '1')); // skip the first-run tutorial
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   const ev = (x) => p.evaluate(x);
   const wait = (ms) => p.waitForTimeout(ms);
@@ -33,7 +34,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(await ev(`getComputedStyle(document.getElementById('lockBtn')).display`) === 'block', 'LOCK button appears when power is full');
   await p.keyboard.press('KeyL'); await wait(200);
   ok(await ev('lockinTimer > 7'), 'L activates lock-in');
-  await p.mouse.move(500, 20); await wait(900);
+  await p.mouse.move(500, 20); await p.waitForFunction('Math.abs(shipLane) < 0.3', null, { timeout: 5000 }).catch(() => {});
   ok(Math.abs(await ev('shipLane')) < 0.3, 'during lock-in the ship can ride to the top of the ring');
   ok(await ev('bolts.length') > 3, 'lock-in auto-fires');
   await p.screenshot({ path: process.argv[2] + '/lockin.png' });
@@ -44,6 +45,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   // phone look
   const c = await b.newContext({ ...devices['iPhone 13'] });
   const q = await c.newPage();
+  await q.addInitScript(() => localStorage.setItem('vortex-tutorial', '1')); // skip the first-run tutorial
   await q.goto('http://127.0.0.1:8765/index.html'); await q.waitForTimeout(400);
   await q.evaluate(() => startGame(false)); await q.waitForTimeout(400);
   await q.evaluate('briefingTimer = 0; power = 100; updatePlasmaUI()');

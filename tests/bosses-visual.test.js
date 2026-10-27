@@ -2,6 +2,7 @@ const { chromium } = require('playwright');
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1000, height: 760 } });
+  await p.addInitScript(() => localStorage.setItem('vortex-tutorial', '1')); // skip the first-run tutorial
   await p.goto('http://127.0.0.1:8765/index.html'); await p.waitForTimeout(300);
   await p.evaluate('startGame(false)'); await p.waitForTimeout(200);
   const shots = [];

@@ -3,6 +3,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1000, height: 720 } });
+  await p.addInitScript(() => localStorage.setItem('vortex-tutorial', '1')); // skip the first-run tutorial
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   const ev = (x) => p.evaluate(x);
   await p.goto('http://127.0.0.1:8765/index.html'); await ev('localStorage.clear()'); await p.reload(); await p.waitForTimeout(300);
@@ -28,6 +29,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   ok(await ev('zapperCharges') === 2 && await ev('plasmaMax') === Math.round(150 * 0.4 * 1.15), 'upgrades apply: 2 bombs, bigger plasma');
   console.log('errors', JSON.stringify(errs));
   const q = await (await b.newContext({ ...devices['iPhone 13'] })).newPage();
+  await q.addInitScript(() => localStorage.setItem('vortex-tutorial', '1')); // skip the first-run tutorial
   await q.goto('http://127.0.0.1:8765/index.html'); await q.evaluate('coins = 230; upgrades = {plasma: 2, magnet: 1}; saveWallet(); showScreen("shop")'); await q.waitForTimeout(400);
   await q.screenshot({ path: process.argv[2] + '/shop.png' });
   await q.evaluate('startGame(false)'); await q.waitForTimeout(200);

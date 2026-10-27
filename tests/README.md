@@ -28,6 +28,7 @@ port it is reused. Screenshots land in `tests/shots/` (not committed).
 | `levels` | one map per level, change after the boss; midway checkpoint; trench vent; Rift gates |
 | `campaign` | mission types, briefing, boss/level music, final boss, radar, Spanish comms |
 | `checkpoints` | checkpoint save and CONTINUE |
+| `tutorial` | first-run guided warm-up, once only, replay and skip |
 | `pause` | P / Esc / button, auto-pause when hidden, MENU, no pause in versus |
 | `ship-classes` | class choice, hulls, bombs, warp spikes, gunner + interceptor perks |
 | `powerups` | shield, nova, ship movement, bullseye lock, pickup mix |
@@ -41,6 +42,9 @@ port it is reused. Screenshots land in `tests/shots/` (not committed).
 | `screens`, `cockpit`, `jack-in`, `shatter`, `rift` | start screens, cockpit view, camera intro, ship shatter, THE RIFT |
 | `coop`, `versus`, `daemons` | multiplayer over the local PeerJS server |
 | `bosses-visual`, `iphone-visual` | screenshots (and layout checks at iPhone size) |
+
+Every test except `tutorial` marks the tutorial as done through
+`addInitScript`, so runs start straight into level 1.
 
 Many checks depend on frame timing in a headless browser; where a test
 waits for something to happen it polls (`waitForFunction`) rather than

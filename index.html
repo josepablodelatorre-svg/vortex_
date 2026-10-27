@@ -777,6 +777,39 @@
     text-shadow: 0 0 6px #ff78ff;
   }
   /* Mission briefing (from X): shown for a few seconds as each level opens */
+  /* first-run tutorial coach: one instruction at a time */
+  #coach {
+    position: fixed;
+    top: 31%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(500px, calc(100vw - 32px));
+    box-sizing: border-box;
+    display: none;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    text-align: center;
+    background: rgba(10, 0, 24, 0.75);
+    border: 1px solid rgba(255, 225, 77, 0.6);
+    box-shadow: 0 0 18px rgba(255, 225, 77, 0.25);
+    padding: 12px 14px;
+    z-index: 6;
+    user-select: none;
+    pointer-events: none; /* taps go through to the game; only SKIP is a button */
+  }
+  #coachstep { font-size: 8px; color: #ffe14d; opacity: 0.8; margin-bottom: 8px; letter-spacing: 2px; }
+  #coachtext { font-size: 11px; line-height: 1.7; color: #fff6c8; text-shadow: 0 0 8px #ffe14d; }
+  #coachskip {
+    margin-top: 10px;
+    background: transparent;
+    border: 1px solid rgba(255, 225, 77, 0.5);
+    color: #ffe14d;
+    font-family: inherit;
+    font-size: 8px;
+    letter-spacing: 2px;
+    padding: 7px 10px;
+    cursor: pointer;
+    pointer-events: auto;
+  }
   #briefing {
     position: fixed;
     top: 31%;
@@ -1182,6 +1215,7 @@
       <button id="crtToggle" class="selected">CRT: ON</button>
       <button id="langToggle">COMMS: EN</button>
       <button id="viewToggle">VIEW: CHASE</button>
+      <button id="tutorialBtn">PLAY TUTORIAL</button>
     </div>
     <button class="back" data-go="menu">&lt; BACK</button>
   </section>
@@ -1210,6 +1244,7 @@
 <canvas id="digitize"></canvas>
 <canvas id="portrait" width="132" height="100"></canvas>
 <div id="briefing"><div id="briefingtitle"></div><div id="briefingtext"></div></div>
+<div id="coach"><div id="coachstep"></div><div id="coachtext"></div><button id="coachskip">SKIP TUTORIAL</button></div>
 <div id="comms"><span id="commslabel">&gt; COMMAND</span><span id="commstext"></span></div>
 <div id="gameover">
   <h1 id="losttitle">SIGNAL LOST</h1>
@@ -2093,6 +2128,7 @@ function continueFromCheckpoint() {
   const cp = checkpoint;
   initAudio();
   startGame(false, 'campaign');
+  stopTutorial(true); // a checkpoint means this pilot has flown before
   runTier = cp.runTier;
   currentLevel = cp.level;
   score = cp.score;
@@ -2132,6 +2168,7 @@ function lockIn() {
   if (state !== 'playing' || power < 100 || lockinTimer > 0) return;
   lockinTimer = LOCKIN_DURATION;
   missionEvent('lockin');
+  tutorialEvent('lockin');
   lockinFireTimer = 0;
   triggerShake(6, 0.3);
   playPowerUp();
@@ -2384,7 +2421,7 @@ function startLevelMission() {
 
 // quiet stretches where nothing new spawns: the warp, and reading a briefing
 function calmPhase() {
-  return warpTimer > 0 || briefingTimer > 0;
+  return warpTimer > 0 || briefingTimer > 0 || !!tutorial;
 }
 
 function currentKillTarget() {
@@ -3836,6 +3873,9 @@ function startGame(continuing, mode) {
   showLevelBanner(runTier > 0 ? 'RUN ' + (runTier + 1) : 'LEVEL 1');
   if (gameMode === 'rift') enterRiftSector();
   onLevelStart();
+  tutorial = null;
+  document.getElementById('coach').style.display = 'none';
+  if (!continuing) maybeStartTutorial();
   for (const key in commsCooldowns) delete commsCooldowns[key];
   comms = null;
   lastShotTime = t;
@@ -4391,6 +4431,7 @@ function superzap() {
   if (state !== 'playing' || zapperCharges <= 0 || warpTimer > 0) return;
   zapperCharges -= 1;
   triggerNova();
+  tutorialEvent('bomb');
   // the boss can't be zapped away, but it's blasted back down the tunnel
   if (boss && boss.alive) boss.z = Math.max(boss.z, BOSS_RESET_Z);
   updateZapUI();
@@ -4469,6 +4510,7 @@ function spawnPowerup() {
 
 function collectPowerup(p) {
   p.alive = false;
+  tutorialEvent('pickup');
   playPowerUp();
   const pickupCallouts = {
     hull: ['+' + HULL_REPAIR_PER_POWERUP + ' HULL', '#ffd23f', ['REPAIRS ONLINE.', 'PATCHED UP. KEEP GOING!']],
@@ -4669,7 +4711,7 @@ function update(dt) {
       if (e.alive && e.z <= 0.03) {
         e.alive = false;
         if (inShipLane(e.angle)) damageShip(HULL_DAMAGE_PER_HIT);
-        else missionEvent('dodge');
+        else { missionEvent('dodge'); tutorialEvent('dodge'); }
         if (!inShipLane(e.angle) && inShipLane(e.angle, LANE_HIT * 2.2)) {
           shipCallout('DODGED!', '#9fffb0');
           say('dodge', { en: ['CLOSE ONE!', 'WATCH YOUR SIX, HOTSHOT!', 'NICE MOVES!'], es: ['¡POR POCO!', '¡CUIDA TU RETAGUARDIA!', '¡BUENOS REFLEJOS!'] }, 1, 12);
@@ -7226,6 +7268,158 @@ document.getElementById('playBtn').addEventListener('click', (e) => {
   startGame(false, 'campaign');
 });
 // back to the menu from a results screen
+// ---- first-run tutorial ----
+// The first campaign run starts with a short guided warm-up on level 1: one
+// instruction at a time, each waiting for the pilot to actually do it (no
+// regular spawns meanwhile, and the hull can't drop below half). Skippable,
+// shown once (vortex-tutorial), replayable from SETTINGS.
+const TUTORIAL_STEPS = [
+  { id: 'aim',
+    en: () => isTouch ? 'DRAG TO AIM. YOUR SHIP SLIDES ALONG THE BOTTOM OF THE TUNNEL.' : 'MOVE THE MOUSE TO AIM. YOUR SHIP SLIDES ALONG THE BOTTOM OF THE TUNNEL.',
+    es: () => isTouch ? 'ARRASTRA PARA APUNTAR. TU NAVE SE DESLIZA POR LA PARTE BAJA DEL TUNEL.' : 'MUEVE EL MOUSE PARA APUNTAR. TU NAVE SE DESLIZA POR LA PARTE BAJA DEL TUNEL.' },
+  { id: 'fire',
+    en: () => isTouch ? 'TAP TO FIRE ALONG THE YELLOW AIM LINE.' : 'CLICK TO FIRE ALONG THE YELLOW AIM LINE.',
+    es: () => isTouch ? 'TOCA PARA DISPARAR SOBRE LA LINEA AMARILLA.' : 'HAZ CLIC PARA DISPARAR SOBRE LA LINEA AMARILLA.' },
+  { id: 'kill',
+    en: () => 'THREE HOSTILES INCOMING. SHOOT THEM DOWN.',
+    es: () => 'TRES HOSTILES EN CAMINO. DERRIBALOS.' },
+  { id: 'dodge',
+    en: () => 'ONLY WHAT REACHES YOUR LANE HURTS YOU. SLIDE OUT OF THE WAY OF THIS ONE.',
+    es: () => 'SOLO TE DANA LO QUE LLEGA A TU CARRIL. QUITATE DEL CAMINO DE ESTE.' },
+  { id: 'pickup',
+    en: () => 'PICKUPS GIVE YOU POWERS. SHOOT IT OR FLY INTO IT.',
+    es: () => 'LOS OBJETOS TE DAN PODERES. DISPARALE O VUELA HACIA EL.' },
+  { id: 'bomb',
+    en: () => isTouch ? 'SURROUNDED? TAP BOMB TO CLEAR THE SCREEN.' : 'SURROUNDED? PRESS SPACE (OR RIGHT-CLICK) TO DROP A BOMB.',
+    es: () => isTouch ? '¿RODEADO? TOCA BOMB PARA LIMPIAR LA PANTALLA.' : '¿RODEADO? PRESIONA ESPACIO (O CLIC DERECHO) PARA SOLTAR UNA BOMBA.' },
+  { id: 'lockin',
+    en: () => isTouch ? 'KILLS FILL YOUR POWER BAR. IT IS FULL: TAP LOCK FOR LOCK-IN.' : 'KILLS FILL YOUR POWER BAR. IT IS FULL: PRESS L FOR LOCK-IN.',
+    es: () => isTouch ? 'LAS BAJAS LLENAN TU BARRA DE PODER. ESTA LLENA: TOCA LOCK.' : 'LAS BAJAS LLENAN TU BARRA DE PODER. ESTA LLENA: PRESIONA L.' }
+];
+let tutorial = null; // { step, t, aimFrom, shots, kills, done }
+let tutorialDone = false;
+try {
+  // pilots who already have a best score have played: don't make them sit it
+  tutorialDone = !!localStorage.getItem('vortex-tutorial') || !!localStorage.getItem('vortex-best-score');
+} catch (e) { /* ignore */ }
+
+function maybeStartTutorial() {
+  if (tutorialDone || gameMode !== 'campaign' || daily || versus || runTier > 0) return;
+  tutorial = { step: -1 };
+  briefingTimer = 0;
+  document.getElementById('briefing').style.opacity = '0';
+  document.getElementById('coach').style.display = 'block';
+  nextTutorialStep();
+}
+
+function nextTutorialStep() {
+  tutorial.step += 1;
+  tutorial.t = 0;
+  tutorial.done = false;
+  const step = TUTORIAL_STEPS[tutorial.step];
+  if (!step) { stopTutorial(false); return; }
+  document.getElementById('coachstep').textContent = (lang === 'es' ? 'ENTRENAMIENTO ' : 'TRAINING ') + (tutorial.step + 1) + '/' + TUTORIAL_STEPS.length;
+  document.getElementById('coachtext').textContent = arcadeCaps(lang === 'es' ? step.es() : step.en());
+  tutorial.aimFrom = shipLane;
+  tutorial.shots = levelShots;
+  tutorial.kills = killCount;
+  if (step.id === 'kill') {
+    for (const off of [-0.5, 0, 0.5]) {
+      spawnEnemy(normalizeAngle(Math.PI + off), 'drone');
+      enemies.at(-1).z = 0.95;
+      enemies.at(-1).speed *= 0.6;
+    }
+  } else if (step.id === 'dodge') {
+    // one drone straight down the ship's own lane
+    spawnEnemy(shipLane, 'drone');
+    enemies.at(-1).z = 0.9;
+    enemies.at(-1).fireTimer = 99;
+  } else if (step.id === 'pickup') {
+    powerups.push({ angle: normalizeAngle(shipLane + 0.3), z: 0.9, alive: true, kind: 'star' });
+  } else if (step.id === 'bomb') {
+    zapperCharges = Math.max(1, zapperCharges);
+    updateZapUI();
+    for (let i = 0; i < 6; i++) {
+      spawnEnemy(normalizeAngle(Math.PI + (i - 2.5) * 0.45), 'drone');
+      enemies.at(-1).z = 0.75 + i * 0.03;
+      enemies.at(-1).speed *= 0.4;
+    }
+  } else if (step.id === 'lockin') {
+    power = 100;
+    updatePlasmaUI();
+  }
+}
+
+function tutorialEvent(kind) {
+  if (!tutorial || tutorial.done) return;
+  const id = TUTORIAL_STEPS[tutorial.step].id;
+  if (kind === id || (id === 'kill' && kind === 'bomb')) completeTutorialStep();
+}
+
+function completeTutorialStep() {
+  tutorial.done = true;
+  tutorial.t = 0;
+  shipCallout(lang === 'es' ? '¡BIEN!' : 'NICE!', '#ffe14d');
+  playPowerUp();
+}
+
+function updateTutorial(dt) {
+  if (!tutorial) return;
+  if (state !== 'playing') { stopTutorial(true); return; }
+  if (paused) return;
+  tutorial.t += dt;
+  // a short beat after each success before the next instruction
+  if (tutorial.done) { if (tutorial.t > 1.1) nextTutorialStep(); return; }
+  hull = Math.max(hull, hullMax * 0.5);
+  const id = TUTORIAL_STEPS[tutorial.step].id;
+  if (id === 'aim' && Math.abs(normalizeAngle(shipLane - tutorial.aimFrom)) > 0.6) completeTutorialStep();
+  else if (id === 'fire' && levelShots - tutorial.shots >= 3) completeTutorialStep();
+  else if (id === 'kill' && !enemies.length) completeTutorialStep();
+  else if (id === 'dodge' && !enemies.length) {
+    // got hit instead: that's the lesson too, move on
+    completeTutorialStep();
+  } else if (id === 'pickup' && !powerups.length) completeTutorialStep();
+  else if (id === 'bomb' && !enemies.length) completeTutorialStep();
+  else if (id === 'lockin' && tutorial.t > 12) completeTutorialStep();
+}
+
+// quiet: leave without the hand-off (game over, menu, continue)
+function stopTutorial(quiet) {
+  if (!tutorial) return;
+  tutorial = null;
+  tutorialDone = true;
+  try { localStorage.setItem('vortex-tutorial', '1'); } catch (e) { /* ignore */ }
+  document.getElementById('coach').style.display = 'none';
+  if (quiet || state !== 'playing') return;
+  // the real level 1 starts clean: count, bomb and power back to normal
+  enemies = [];
+  enemyBolts = [];
+  killCount = 0;
+  score = 0;
+  document.getElementById('score').textContent = score;
+  hull = hullMax;
+  plasma = plasmaMax;
+  power = Math.min(power, 99);
+  zapperCharges = 1 + up('bomb');
+  levelShots = 0;
+  levelHits = 0;
+  updateHullUI();
+  updatePlasmaUI();
+  updateZapUI();
+  startLevelMission();
+  say('tutorialDone', { en: ['TRAINING COMPLETE. NOW FOR REAL, PILOT.', 'THAT IS ALL YOU NEED. GOOD HUNTING.'], es: ['ENTRENAMIENTO COMPLETO. AHORA EN SERIO, PILOTO.', 'ES TODO LO QUE NECESITAS. BUENA CACERIA.'] }, 3, 0);
+}
+
+document.getElementById('coachskip').addEventListener('click', (e) => { e.stopPropagation(); stopTutorial(false); });
+document.getElementById('coachskip').addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+document.getElementById('coachskip').addEventListener('mousedown', (e) => e.stopPropagation());
+document.getElementById('tutorialBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  initAudio();
+  tutorialDone = false;
+  startGame(false, 'campaign');
+});
+
 // ---- pause ----
 // P / Esc / the II button, and automatically whenever the app is hidden
 // (phone lock, tab switch, notification shade). Not in versus: the other
@@ -7373,6 +7567,7 @@ function loop(now) {
   syncRunClass();
   drawPortrait();
   updateClipRecording(dt);
+  updateTutorial(dt);
   if (state === 'title') drawShipPreview();
   requestAnimationFrame(loop);
 }

@@ -3,6 +3,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1000, height: 720 } });
+  await p.addInitScript(() => localStorage.setItem('vortex-tutorial', '1')); // skip the first-run tutorial
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   const ev = (x) => p.evaluate(x);
   await p.goto('http://127.0.0.1:8765/index.html'); await ev('localStorage.clear()'); await p.reload(); await p.waitForTimeout(300);
@@ -22,6 +23,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await p.screenshot({ path: process.argv[2] + '/cockpit.png' });
   console.log('errors', JSON.stringify(errs));
   const q = await (await b.newContext({ ...devices['iPhone 13'] })).newPage();
+  await q.addInitScript(() => localStorage.setItem('vortex-tutorial', '1')); // skip the first-run tutorial
   await q.goto('http://127.0.0.1:8765/index.html'); await q.evaluate(`localStorage.setItem('vortex-view', 'cockpit')`); await q.reload(); await q.waitForTimeout(300);
   await q.evaluate('startGame(false); briefingTimer = 0; document.getElementById("briefing").style.display = "none"; for (let i = 0; i < 4; i++) spawnEnemy();'); await q.waitForTimeout(900);
   await q.screenshot({ path: process.argv[2] + '/cockpit-ip.png' });

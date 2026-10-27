@@ -331,6 +331,16 @@ with a `vent` track item you must shoot (+500), sent at 85% of the level
 just before the boss (`ventSpawned`); asteroid fields add `rock`
 enemies (3 hp).
 
+**Tutorial** — the first campaign run opens with a guided warm-up on
+level 1 (`TUTORIAL_STEPS`: aim, fire, kill three, dodge one, grab a
+pickup, bomb, lock-in), one instruction at a time in the `#coach` panel,
+each waiting for the pilot to do it (`tutorialEvent()` hooks plus checks
+in `updateTutorial()`). Regular spawns pause (`calmPhase()`), the hull
+can't drop below half, and level 1 then starts clean with its briefing.
+SKIP TUTORIAL leaves at any point; it runs once (`vortex-tutorial`, and
+pilots with a best score never see it) and SETTINGS has PLAY TUTORIAL.
+The panel lets taps through, so firing works under it.
+
 **Pause** — P / Esc / the II button under the radar (`pauseGame()` /
 `resumeGame()`); the game also pauses itself on `visibilitychange` and
 window `blur` (phone lock, tab switch). While paused the loop skips every

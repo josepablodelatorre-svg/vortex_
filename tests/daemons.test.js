@@ -3,7 +3,9 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
 (async () => {
   const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
   const A = await (await b.newContext({ viewport: { width: 1000, height: 720 } })).newPage();
+  await A.addInitScript(() => localStorage.setItem('vortex-tutorial', '1')); // skip the first-run tutorial
   const B = await (await b.newContext({ viewport: { width: 1000, height: 720 } })).newPage();
+  await B.addInitScript(() => localStorage.setItem('vortex-tutorial', '1')); // skip the first-run tutorial
   const errs = [];
   A.on('pageerror', e => errs.push('A: ' + e.message)); B.on('pageerror', e => errs.push('B: ' + e.message));
   const a = (x) => A.evaluate(x), bb = (x) => B.evaluate(x);
