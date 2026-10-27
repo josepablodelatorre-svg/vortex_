@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VORTEX Privacy Policy</title>
+<meta name="theme-color" content="#05000f">
+<link rel="icon" href="img/icons/icon-192.png">
+<style>
+  @font-face {
+    font-family: 'Press Start 2P';
+    src: url('fonts/press-start-2p.woff2') format('woff2');
+    font-display: swap;
+  }
+  :root { color-scheme: dark; }
+  html, body { margin: 0; background: #05000f; color: #e8d6ff; }
+  body { font: 16px/1.65 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; padding: 32px 16px 64px; }
+  main { max-width: 720px; margin: 0 auto; }
+  h1, h2 { font-family: 'Press Start 2P', monospace; font-weight: normal; letter-spacing: 1px; }
+  h1 { font-size: 20px; color: #3c8aff; text-shadow: 0 0 12px #3c8aff; margin: 0 0 8px; line-height: 1.5; }
+  h2 { font-size: 12px; color: #ff3cdc; margin: 36px 0 10px; line-height: 1.6; }
+  p, li { color: #d9c8f2; }
+  .updated { color: #9a86b8; font-size: 14px; margin-bottom: 28px; }
+  .short { border: 1px solid rgba(63, 255, 102, 0.5); padding: 14px 16px; background: rgba(63, 255, 102, 0.05); }
+  .short p { margin: 0; color: #b9ffcb; }
+  a { color: #ffe14d; }
+  code { color: #b9ffcb; }
+  .es { margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(168, 85, 255, 0.3); }
+</style>
+</head>
+<body>
+<main>
+<h1>VORTEX PRIVACY POLICY</h1>
+<p class="updated">Last updated: October 27, 2026 · Nemo Inc</p>
+
+<div class="short"><p><strong>In short:</strong> VORTEX has no accounts, no ads and no tracking. Your progress stays on your device. The only things that leave it are a nickname and score you post to the world leaderboard, and the connection details needed when you choose to play multiplayer. The camera, if you allow it, is only used on your screen and is never uploaded.</p></div>
+
+<h2>WHAT STAYS ON YOUR DEVICE</h2>
+<p>Your progress and settings (coins, upgrades, missions, achievements, checkpoints, best scores, your local leaderboard, your pilot name, volume and display settings) are saved in your browser's local storage on your device. We don't receive them. Clearing your browser's site data deletes them; SETTINGS → SAVE BACKUP lets you keep a copy yourself.</p>
+<p>The game's files are also cached on your device so it can be installed and played offline.</p>
+
+<h2>THE WORLD LEADERBOARD</h2>
+<p>When a run ends, the game sends this to our leaderboard database so it can appear on the public WORLD board:</p>
+<ul>
+  <li>your pilot nickname (up to 10 characters; anything you type, so please don't use your real name),</li>
+  <li>the score, the game mode, how far you got, your rank letter and your ship type,</li>
+  <li>the date, and the game's version number.</li>
+</ul>
+<p>These entries are public: anyone playing VORTEX can see them. They aren't linked to an account, email or device ID. The database is hosted by <a href="https://supabase.com/privacy" target="_blank" rel="noopener">Supabase</a>, which, like any web server, processes your IP address to deliver the request. We remove entries with offensive names. To have an entry removed, contact us (below) with the nickname, score and date.</p>
+
+<h2>MULTIPLAYER</h2>
+<p>Co-op, versus and Daemons connect devices directly to each other (WebRTC). To find each other, devices briefly contact the free PeerJS connection service and public STUN servers (Google, Cloudflare), which see your IP address for that purpose. The devices you play with can also see each other's IP addresses, as with any peer-to-peer game. Only game data is exchanged (names, aim, shots, scores); nothing is recorded by us.</p>
+
+<h2>THE CAMERA</h2>
+<p>The optional "jack in" intro can show you as a scan-line portrait. It only starts if you allow camera access, the image is processed on your device and shown on your screen only, and it's never uploaded, saved or sent to other players. You can deny or revoke the permission at any time in your browser settings; the game works the same without it.</p>
+
+<h2>CLIPS</h2>
+<p>SAVE CLIP records the last few seconds of play into a video file that's downloaded to your device. It isn't uploaded anywhere unless you choose to share it yourself.</p>
+
+<h2>WHAT WE DON'T DO</h2>
+<ul>
+  <li>No ads and no ad trackers.</li>
+  <li>No analytics or tracking cookies.</li>
+  <li>No accounts, emails or payment details.</li>
+  <li>No selling or sharing of personal data.</li>
+</ul>
+
+<h2>CHILDREN</h2>
+<p>VORTEX doesn't ask for personal information. Because leaderboard nicknames are public, we ask younger players to use a made-up nickname, never their real name.</p>
+
+<h2>CHANGES AND CONTACT</h2>
+<p>If this policy changes (for example when VORTEX comes to app stores) we'll update this page and the date above. Questions or removal requests: open an issue at <a href="https://github.com/josepablodelatorre-svg/vortex_/issues" target="_blank" rel="noopener">github.com/josepablodelatorre-svg/vortex_</a>.</p>
+
+<section class="es" lang="es">
+<h2>RESUMEN EN ESPANOL</h2>
+<p>VORTEX no tiene cuentas, anuncios ni rastreo. Tu progreso se guarda solo en tu dispositivo. Lo único que sale de él es el apodo y la puntuación que se publican en la tabla mundial (son públicos: no uses tu nombre real), y los datos de conexión necesarios cuando eliges jugar multijugador (los dispositivos se conectan directamente y ven sus direcciones IP). La cámara, si la permites, se usa solo en tu pantalla y nunca se sube. Para borrar una entrada de la tabla, escríbenos en GitHub (enlace arriba).</p>
+</section>
+</main>
+</body>
+</html>

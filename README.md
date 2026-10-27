@@ -37,6 +37,7 @@ src/             — the game, as plain scripts loaded in this order:
   gamepad.js       game controllers (Gamepad API)
   main.js          the requestAnimationFrame loop
 pad.html         — the phone controller for co-op
+privacy.html     — privacy policy (linked from CREDITS)
 lib/             — PeerJS + qrcode-generator (MIT, see LICENSES.txt)
 fonts/           — Press Start 2P (SIL Open Font License, fonts/OFL.txt)
 img/nemo-logo.png

@@ -6,7 +6,7 @@
 // silent music-wise. Multiplayer always needs the network.
 const CACHE = 'vortex-v2';
 const SHELL = [
-  './', 'index.html', 'pad.html', 'style.css', 'manifest.webmanifest',
+  './', 'index.html', 'pad.html', 'privacy.html', 'style.css', 'manifest.webmanifest',
   'img/nemo-logo.png', 'img/icons/icon-192.png', 'img/icons/icon-512.png', 'fonts/press-start-2p.woff2',
   'lib/peerjs.min.js', 'lib/qrcode.js',
   'src/save.js', 'src/audio.js', 'src/progression.js', 'src/world.js', 'src/environments.js',
