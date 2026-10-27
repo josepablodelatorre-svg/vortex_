@@ -770,6 +770,27 @@ body.calm .flicker-char { animation: none !important; opacity: 1 !important; }
 }
 #missionmult, #streaktag { font-size: 10px !important; color: #3f6; text-shadow: 0 0 8px #3f6; opacity: 1 !important; margin: 0 0 12px !important; }
 #streaktag { color: #ff8c28; text-shadow: 0 0 8px #ff8c28; margin: 14px 0 0 !important; }
+#boardtabs { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; flex-wrap: wrap; }
+#boardtabs button {
+  min-width: 0;
+  margin: 0;
+  background: transparent;
+  border: 1px solid #3c8aff;
+  color: #3c8aff;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+#boardtabs button.selected { background: #3c8aff; color: #000; box-shadow: 0 0 12px #3c8aff; }
+#boardlist { display: flex; flex-direction: column; gap: 4px; max-width: 460px; margin: 0 auto 10px; }
+.boardrow { display: grid; grid-template-columns: 3.4em 1fr auto 4.2em 1.4em; gap: 8px; align-items: center; font-size: 9px; letter-spacing: 1px; padding: 6px 8px; border: 1px solid rgba(60, 138, 255, 0.25); text-align: left; }
+.boardrow .sc { text-align: right; color: #fff6c8; }
+.boardrow .rk { text-align: center; }
+.boardrow.me { border-color: #ffe14d; box-shadow: 0 0 10px rgba(255, 225, 77, 0.35); }
+.boardempty { font-size: 9px; opacity: 0.6; padding: 14px; }
+.boardtag { font-size: 11px !important; color: #ffe14d !important; text-shadow: 0 0 10px #ffe14d; min-height: 1em; }
 #missionlist { display: flex; flex-direction: column; gap: 8px; max-width: 460px; margin: 0 auto 10px; }
 .missionrow { border: 1px solid rgba(60, 138, 255, 0.35); padding: 9px 10px; font-size: 9px; letter-spacing: 1px; text-align: left; }
 .missionrow.done { border-color: #3f6; color: #3f6; }

@@ -56,6 +56,7 @@
       <button data-go="multi">MULTIPLAYER &gt;</button>
       <button data-go="hangar">HANGAR &gt;</button>
       <button data-go="missions" id="missionsBtn">MISSIONS &gt;</button>
+      <button data-go="board" id="boardBtn">LEADERBOARD &gt;</button>
       <button data-go="shop" id="shopBtn">UPGRADES &gt;</button>
       <button data-go="settings">SETTINGS &gt;</button>
     </div>
@@ -107,6 +108,13 @@
     <div id="missionlist"></div>
     <p id="streaktag"></p>
     <p class="menunote">FINISH ALL THREE TO RAISE YOUR SCORE MULTIPLIER FOR GOOD</p>
+    <button class="back" data-go="menu">&lt; BACK</button>
+  </section>
+  <section class="screen" data-screen="board">
+    <h2>LEADERBOARD</h2>
+    <div id="boardtabs"><button data-board="campaign" class="selected">CAMPAIGN</button><button data-board="rift">RIFT</button><button data-board="daily">DAILY</button></div>
+    <div id="boardlist"></div>
+    <p class="menunote">TOP 10 ON THIS DEVICE</p>
     <button class="back" data-go="menu">&lt; BACK</button>
   </section>
   <section class="screen" data-screen="shop">
@@ -176,6 +184,7 @@
   <h1 id="losttitle">SIGNAL LOST</h1>
   <div class="rank" id="rankLost"></div>
   <p id="finalscore"></p>
+  <p class="boardtag" id="boardLost"></p>
   <p id="losthint">CLICK TO RETRY</p>
   <button id="contFromLost" class="riftBtn">CONTINUE FROM CHECKPOINT</button>
   <div class="resultBtns"><button class="clipBtn">SAVE CLIP</button><button class="shareBtn">SHARE</button><button class="menuBtn">MENU</button></div>
@@ -184,6 +193,7 @@
   <h1 id="wontitle">SIGNAL SECURED</h1>
   <div class="rank" id="rankWon"></div>
   <p id="clearedscore"></p>
+  <p class="boardtag" id="boardWon"></p>
   <p id="wonhint">CLICK TO PUSH DEEPER</p>
   <button id="riftFromCleared" class="riftBtn">OR ENTER THE RIFT</button>
   <div class="resultBtns"><button class="clipBtn">SAVE CLIP</button><button class="shareBtn">SHARE</button><button class="menuBtn">MENU</button></div>

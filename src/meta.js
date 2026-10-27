@@ -470,7 +470,77 @@ function updateBestTag() {
 }
 updateBestTag();
 
+// ---------- Leaderboard: top 10 per mode on this device ----------
+// Saved as vortex-leaderboard = { campaign: [...], rift: [...], daily: [...] },
+// each entry { name, score, reach, rank, cls, date }. The daily board only
+// shows today's tunnel. An online board would hang off addToBoard().
+const BOARD_SIZE = 10;
+let boards = { campaign: [], rift: [], daily: [] };
+try { Object.assign(boards, JSON.parse(store.getItem('vortex-leaderboard') || '{}')); } catch (e) { /* ignore */ }
+let boardView = 'campaign';
+let lastBoardEntry = null; // highlighted on the board screen
+
+function boardEntries(mode) {
+  const list = boards[mode] || [];
+  return mode === 'daily' ? list.filter(e => e.date === todayKey()) : list;
+}
+
+// returns the run's place on its board (1..10), or 0 if it didn't make it
+function addToBoard() {
+  if (versus || score <= 0) return 0;
+  const mode = daily ? 'daily' : gameMode === 'rift' ? 'rift' : 'campaign';
+  const won = state === 'cleared';
+  const entry = {
+    name: (pilotName || 'PILOT').slice(0, 10),
+    score,
+    reach: gameMode === 'rift' ? 'D' + riftDepth : (won ? 'WIN' : 'L' + currentLevel) + (runTier > 0 ? '+' + runTier : ''),
+    rank: runRank(won).letter,
+    cls: SHIP_CLASSES[shipClassIndex].name,
+    date: todayKey(),
+    at: Date.now()
+  };
+  let list = (boards[mode] || []).concat([entry]);
+  if (mode === 'daily') list = list.filter(e => e.date === todayKey());
+  list.sort((a, b) => b.score - a.score || a.at - b.at);
+  list = list.slice(0, BOARD_SIZE);
+  boards[mode] = list;
+  try { store.setItem('vortex-leaderboard', JSON.stringify(boards)); } catch (e) { /* ignore */ }
+  const place = list.indexOf(entry) + 1;
+  if (place) { lastBoardEntry = entry; boardView = mode; }
+  return place;
+}
+
+function renderBoard() {
+  for (const b of document.querySelectorAll('#boardtabs button')) b.classList.toggle('selected', b.dataset.board === boardView);
+  const el = document.getElementById('boardlist');
+  const list = boardEntries(boardView);
+  el.innerHTML = '';
+  if (!list.length) {
+    el.innerHTML = '<div class="boardempty">' + (boardView === 'daily' ? 'NO RUNS ON TODAY\'S TUNNEL YET' : 'NO RUNS YET. GO SET ONE!') + '</div>';
+    return;
+  }
+  list.forEach((e, i) => {
+    const row = document.createElement('div');
+    row.className = 'boardrow' + (e === lastBoardEntry || (lastBoardEntry && e.at === lastBoardEntry.at) ? ' me' : '');
+    const cells = ['#' + (i + 1), e.name, e.score, e.reach, e.rank];
+    ['', 'nm', 'sc', '', 'rk'].forEach((cls, k) => {
+      const span = document.createElement('span');
+      if (cls) span.className = cls;
+      span.textContent = cells[k];
+      if (k === 4) span.style.color = RANK_COLORS[e.rank] || '#fff';
+      row.appendChild(span);
+    });
+    el.appendChild(row);
+  });
+}
+for (const b of document.querySelectorAll('#boardtabs button')) {
+  b.addEventListener('click', (ev) => { ev.stopPropagation(); boardView = b.dataset.board; renderBoard(); });
+}
+
 function recordRunResult() {
+  const place = addToBoard();
+  const tag = document.getElementById(state === 'cleared' ? 'boardWon' : 'boardLost');
+  tag.textContent = place === 1 ? 'NEW #1 ON THE LEADERBOARD!' : place ? 'LEADERBOARD #' + place : '';
   if (versus) return; // versus scores don't count toward the solo records
   if (gameMode === 'rift') {
     // the Rift keeps its own records: its multiplied scores would swamp

@@ -19,6 +19,7 @@ function showScreen(name) {
   }
   if (name === 'shop') renderShop();
   if (name === 'missions') renderMissions();
+  if (name === 'board') renderBoard();
   const doneCount = missionState.active.filter(m => m.p >= m.n).length;
   document.getElementById('missionsBtn').textContent = 'MISSIONS (' + doneCount + '/3) >';
   document.getElementById('shopBtn').textContent = 'UPGRADES (' + coins + ' C) >';

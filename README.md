@@ -397,6 +397,15 @@ of inverting, the hoop trip is a slow gentle colour drift, screen flashes
 (level change, damage, teleport) are a quarter strength, shake is cut to a
 third, and the CRT and title flicker stop (`body.calm`).
 
+**Leaderboard** — top 10 per mode on this device (`boards`, saved as
+`vortex-leaderboard`): CAMPAIGN, RIFT and DAILY (today's tunnel only).
+Every finished run goes through `addToBoard()` from `recordRunResult()`
+(not versus), with pilot name, score, how far (`L3`, `WIN`, `+1` for a
+New-Game-Plus run, `D7` in the Rift), rank letter and ship class; results
+screens say `NEW #1 ON THE LEADERBOARD!` / `LEADERBOARD #n`. Menu →
+LEADERBOARD (`renderBoard()`) opens on the mode just played and highlights
+the latest entry. An online board would hook into `addToBoard()`.
+
 **Install + offline** — `manifest.webmanifest` (fullscreen, icons in
 `img/icons/`, drawn by script in the game's style) makes VORTEX installable
 to a phone's home screen ("Add to Home Screen" on iPhone, the install
