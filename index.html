@@ -489,6 +489,12 @@
     gap: 7px;
     z-index: 5;
   }
+  #comms.hacked {
+    border-color: rgba(255, 42, 42, 0.7);
+    box-shadow: 0 0 14px rgba(255, 42, 42, 0.35);
+  }
+  #comms.hacked #commslabel { color: #ff2a2a; opacity: 1; }
+  #comms.hacked #commstext { color: #ffb3b3; text-shadow: 0 0 6px #ff2a2a; }
   #commslabel {
     font-size: 8px;
     letter-spacing: 1px;
@@ -955,6 +961,22 @@ function playPowerUp() {
   osc.stop(actx.currentTime + 0.25);
 }
 
+// the rival's signature: a falling, buzzing sawtooth
+function playHack() {
+  if (!actx) return;
+  const osc = actx.createOscillator();
+  const gain = actx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(420, actx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(60, actx.currentTime + 0.35);
+  gain.gain.setValueAtTime(0.07, actx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.38);
+  osc.connect(gain);
+  gain.connect(actx.destination);
+  osc.start();
+  osc.stop(actx.currentTime + 0.4);
+}
+
 // radio blip: two short square chirps ahead of each transmission
 function playComms() {
   if (!actx) return;
@@ -1101,9 +1123,20 @@ function spawnBoss(kind) {
   const hpMax = kind === 'mini'
     ? MINIBOSS_HP + runTier
     : BOSS_HP_BASE + (currentLevel - 1) * BOSS_HP_PER_LEVEL + runTier * 2 + Math.floor(riftTier() * 2);
-  boss = { angle: 0, z: 1.0, hp: hpMax, hpMax, fireTimer: 2.0, alive: true, kind };
+  // Recognizer (from Tron): level 2's boss, and every other Rift gate.
+  // It sways around the tube and stomps forward every few seconds.
+  const recognizer = kind === 'level' && (gameMode === 'rift' ? riftDepth % 6 === 0 : currentLevel === 2);
+  boss = { angle: 0, z: 1.0, hp: hpMax, hpMax, fireTimer: 2.0, alive: true, kind,
+           form: recognizer ? 'recognizer' : 'core', seed: Math.random() * 6, stompTimer: 4, lunge: 0 };
   bossActive = true;
   if (kind !== 'mini') setMusicTrack('boss');
+  if (recognizer) {
+    hack('recognizer', { en: ['RECOGNIZER DISPATCHED. END OF LINE.', 'A RECOGNIZER IS COMING FOR YOU, PILOT.'],
+                         es: ['RECONOCEDOR ENVIADO. FIN DE LINEA.', 'UN RECONOCEDOR VA POR TI, PILOTO.'] }, 4, 0);
+  } else if (kind === 'final') {
+    hack('final', { en: ['YOU WILL NEVER LEAVE THE GRID, PILOT.', 'THIS SYSTEM IS MINE. END OF LINE.'],
+                    es: ['NUNCA SALDRAS DE LA RED, PILOTO.', 'ESTE SISTEMA ES MIO. FIN DE LINEA.'] }, 4, 0);
+  }
   updateBossUI();
 }
 
@@ -1423,6 +1456,85 @@ let novaFlash = 0;        // 1..0, the screen-clearing nova shockwave animation
 // Echo pickup (Gradius-style options): for ECHO_DURATION, every shot is
 // repeated by two ghost ships ECHO_DELAYS later, down the same lane, so
 // fire "reverberates" and catches whatever drifts into the lane after it.
+// Identity disc (from Tron): a pickup worth DISC_THROWS throws. A throw
+// flies out along the aim, sweeps once all the way round the tunnel at
+// that depth slicing through every lane, then comes back. Each enemy it
+// crosses takes a hit (once per throw) through the normal bolt hit code.
+const DISC_THROWS = 3;
+let discCharges = 0;
+let disc = null; // { id, phase: 'out' | 'sweep' | 'back', angle, z, swept, dir }
+let discId = 0;
+
+function throwDisc() {
+  discCharges -= 1;
+  disc = { id: ++discId, phase: 'out', angle: aimAngle, z: 0.05, swept: 0, dir: Math.random() < 0.5 ? -1 : 1 };
+  playZap();
+  playBass(110, 0.3);
+  updateTripleUI();
+}
+
+function updateDisc(dt) {
+  // hidden bolts from last frame's contacts have had their chance to hit
+  bolts = bolts.filter(b => !b.hidden);
+  if (!disc) return;
+  if (disc.phase === 'out') {
+    disc.z += 1.5 * dt;
+    if (disc.z >= 0.5) disc.phase = 'sweep';
+  } else if (disc.phase === 'sweep') {
+    const step = 5.5 * dt;
+    disc.angle = normalizeAngle(disc.angle + disc.dir * step);
+    disc.swept += step;
+    if (disc.swept >= Math.PI * 2) disc.phase = 'back';
+  } else {
+    disc.z -= 1.7 * dt;
+    if (disc.z <= 0.04) {
+      disc = null; // caught
+      playPowerUp();
+      return;
+    }
+  }
+  const touches = (angle, z) => Math.abs(normalizeAngle(angle - disc.angle)) < 0.32 && Math.abs(z - disc.z) < 0.17;
+  for (const e of enemies) {
+    if (e.alive && e.discThrow !== disc.id && touches(e.angle, e.z)) {
+      e.discThrow = disc.id;
+      bolts.push({ angle: e.angle, z: e.z, hidden: true });
+    }
+  }
+  if (boss && boss.alive && boss.discThrow !== disc.id && touches(boss.angle, boss.z)) {
+    boss.discThrow = disc.id;
+    bolts.push({ angle: boss.angle, z: boss.z, hidden: true });
+  }
+}
+
+function drawDisc() {
+  if (!disc) return;
+  const pt = pointOnRing(disc.angle, disc.z);
+  const r = Math.max(6, 22 * (1 - disc.z) + 6);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.translate(pt.x, pt.y);
+  ctx.rotate(t * 18);
+  ctx.strokeStyle = '#e8fdff';
+  ctx.shadowColor = '#50e6ff';
+  ctx.shadowBlur = 24;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2);
+  ctx.stroke();
+  for (let i = 0; i < 4; i++) {
+    ctx.rotate(Math.PI / 2);
+    ctx.beginPath();
+    ctx.moveTo(r * 0.55, 0);
+    ctx.lineTo(r, 0);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 const ECHO_DURATION = 10;
 const ECHO_DELAYS = [0.2, 0.4];
 let echoTimer = 0;
@@ -1616,6 +1728,7 @@ canvas.addEventListener('touchmove', (e) => {
 
 function fire() {
   if (state !== 'playing') return;
+  if (discCharges > 0 && !disc) { throwDisc(); return; }
   const angles = tripleLaserTimer > 0
     ? [-0.16, 0, 0.16].map(off => normalizeAngle(aimAngle + off))
     : [aimAngle];
@@ -1912,6 +2025,8 @@ function startGame(continuing, mode) {
   shipHitWobble = 0;
   echoTimer = 0;
   echoQueue = [];
+  discCharges = 0;
+  disc = null;
   echoTrail = [];
   warpTimer = 0;
   spikes = [];
@@ -1951,7 +2066,9 @@ function startGame(continuing, mode) {
   comms = null;
   lastShotTime = t;
   killStreak = 0;
-  say('start', gameMode === 'rift'
+  if (gameMode === 'rift') {
+    hack('riftHack', { en: 'WELCOME TO MY RIFT, PILOT. NOBODY LEAVES.', es: 'BIENVENIDO A MI GRIETA, PILOTO. NADIE SALE.' }, 3, 0);
+  } else say('start', gameMode === 'rift'
     ? ["YOU'RE ON YOUR OWN OUT HERE, PILOT.", 'NO WAY BACK FROM THE RIFT. GOOD LUCK.']
     : runTier > 0
       ? ['AGAIN, PILOT. THEY KNOW YOU NOW.', 'DEEPER THIS TIME. THEY WILL BE READY.']
@@ -2128,6 +2245,8 @@ const COMMS_ES = {
   "NOVA! THAT CLEARED THE AIR.": "¡NOVA! ESO DESPEJÓ EL AIRE.",
   "ECHO ONLINE! YOUR SHOTS HAVE GHOSTS!": "¡ECO EN LÍNEA! ¡TUS DISPAROS TIENEN FANTASMAS!",
   "ECHO! EVERY SHOT TWICE MORE!": "¡ECO! ¡CADA DISPARO, DOS VECES MÁS!",
+  "DISC ARMED! THROW IT, IT COMES BACK!": "¡DISCO ARMADO! ¡LÁNZALO, REGRESA!",
+  "IDENTITY DISC! SLICE THE WHOLE RING!": "¡DISCO DE IDENTIDAD! ¡CORTA TODO EL ANILLO!",
   "YOU'RE ON YOUR OWN OUT HERE, PILOT.": "AQUÍ ESTÁS SOLO, PILOTO.",
   "NO WAY BACK FROM THE RIFT. GOOD LUCK.": "NO HAY REGRESO DE LA GRIETA. SUERTE.",
   "AGAIN, PILOT. THEY KNOW YOU NOW.": "OTRA VEZ, PILOTO. YA TE CONOCEN.",
@@ -2152,11 +2271,11 @@ function arcadeCaps(text) {
 }
 
 function say(key, lines, priority, cooldown) {
-  if (state !== 'playing') return;
+  if (state !== 'playing') return false;
   if (lines && typeof lines === 'object' && !Array.isArray(lines)) lines = L(lines);
   priority = priority || 1;
-  if (commsCooldowns[key] && t < commsCooldowns[key]) return;
-  if (comms && comms.priority > priority && comms.life > 0.8) return;
+  if (commsCooldowns[key] && t < commsCooldowns[key]) return false;
+  if (comms && comms.priority > priority && comms.life > 0.8) return false;
   commsCooldowns[key] = t + (cooldown === undefined ? 8 : cooldown);
   let text = Array.isArray(lines) ? lines[Math.floor(Math.random() * lines.length)] : lines;
   if (lang === 'es' && COMMS_ES[text]) text = COMMS_ES[text];
@@ -2164,6 +2283,16 @@ function say(key, lines, priority, cooldown) {
   text = arcadeCaps(text);
   comms = { text, chars: 0, priority, life: COMMS_HOLD + text.length * 0.035 };
   playComms();
+  return true;
+}
+
+// The rival AI, OVERSEER, breaks into the channel: same box, but red, a
+// different signature and glitching characters.
+function hack(key, lines, priority, cooldown) {
+  if (say(key, lines, priority, cooldown)) {
+    comms.hack = true;
+    playHack();
+  }
 }
 
 function updateComms(dt) {
@@ -2176,7 +2305,14 @@ function updateComms(dt) {
   comms.chars = Math.min(comms.text.length, comms.chars + dt * 45);
   comms.life -= dt;
   const shown = Math.floor(comms.chars);
-  document.getElementById('commstext').textContent = comms.text.slice(0, shown) + (shown < comms.text.length ? '_' : '');
+  let text = comms.text.slice(0, shown);
+  if (comms.hack) {
+    // corrupt a few characters each frame
+    text = text.replace(/[A-Z]/g, ch => Math.random() < 0.07 ? '#%&@$!'[Math.floor(Math.random() * 6)] : ch);
+  }
+  el.classList.toggle('hacked', !!comms.hack);
+  document.getElementById('commslabel').textContent = comms.hack ? '> OVERSEER' : '> COMMAND';
+  document.getElementById('commstext').textContent = text + (shown < comms.text.length ? '_' : '');
   el.style.opacity = String(Math.max(0, Math.min(1, comms.life / 0.3)));
   if (comms.life <= 0) comms = null;
 }
@@ -2189,6 +2325,9 @@ function commsWatch() {
       say('spikes', ['SPIKES! STEER CLEAR OF THEM!', 'SPIKES ON THE WALLS! MOVE YOUR AIM!'], 3, 0);
     }
     return;
+  }
+  if (hull / hullMax < 0.25) {
+    hack('lowhullHack', { en: 'YOUR HULL IS FAILING, PILOT. HOW FITTING.', es: 'TU CASCO ESTA FALLANDO, PILOTO. QUE APROPIADO.' }, 3, 40);
   }
   if (hull / hullMax < 0.35) {
     say('lowhull', ['HULL CRITICAL! FIND A REPAIR!', "YOU'RE BREAKING UP, PILOT! GRAB A REPAIR!"], 3, 18);
@@ -2448,6 +2587,11 @@ function startWarp(banner) {
 function finishWarp() {
   spikes = [];
   showLevelBanner(warpBanner);
+  if (Math.random() < 0.5) {
+    hack('arriveHack', { en: [camVideo ? 'I CAN SEE YOU, PILOT.' : 'I KNOW YOUR NAME, PILOT.', 'YOUR PROGRAM WILL BE DE-RESOLVED.', 'DEEPER INTO MY SYSTEM. GOOD.'],
+                         es: [camVideo ? 'PUEDO VERTE, PILOTO.' : 'SE TU NOMBRE, PILOTO.', 'TU PROGRAMA SERA DESRESUELTO.', 'MAS ADENTRO DE MI SISTEMA. BIEN.'] }, 3, 0);
+    return onLevelStart();
+  }
   say('arrive', gameMode === 'rift'
     ? ['DEEPER IN. IT ONLY GETS WORSE.', 'NEW SECTOR. STAY SHARP.']
     : ['NEW SECTOR. EYES OPEN.', 'WE MADE IT. HOSTILES AHEAD.', 'STAY SHARP, PILOT.'], 2, 0);
@@ -2479,11 +2623,12 @@ function spawnPowerup() {
   // hull repair is still the most common; the star is a Mario-style power
   // moment; shield, overdrive and the screen-clearing nova are the rarer extras
   const roll = Math.random();
-  const kind = roll < 0.42 ? 'hull'
-    : roll < 0.58 ? 'star'
-    : roll < 0.72 ? 'shield'
-    : roll < 0.84 ? 'overdrive'
-    : roll < 0.93 ? 'echo'
+  const kind = roll < 0.4 ? 'hull'
+    : roll < 0.55 ? 'star'
+    : roll < 0.68 ? 'shield'
+    : roll < 0.79 ? 'overdrive'
+    : roll < 0.87 ? 'echo'
+    : roll < 0.95 ? 'disc'
     : 'nova';
   powerups.push({ angle, z: 1.0, alive: true, kind });
 }
@@ -2497,14 +2642,19 @@ function collectPowerup(p) {
     shield: ['SHIELD UP!', '#50e6ff', ['SHIELDS UP. GO LOUD!', "YOU'RE COVERED. PUSH IN!"]],
     overdrive: ['OVERDRIVE!', '#ff8c28', ["OVERDRIVE! LET 'EM HAVE IT!", 'GUNS HOT! FULL AUTO!']],
     nova: ['NOVA!', '#ff78ff', ['BOOM. SCREEN CLEAR.', 'NOVA! THAT CLEARED THE AIR.']],
-    echo: ['ECHO!', '#b4ff5a', ['ECHO ONLINE! YOUR SHOTS HAVE GHOSTS!', 'ECHO! EVERY SHOT TWICE MORE!']]
+    echo: ['ECHO!', '#b4ff5a', ['ECHO ONLINE! YOUR SHOTS HAVE GHOSTS!', 'ECHO! EVERY SHOT TWICE MORE!']],
+    disc: ['IDENTITY DISC!', '#e8fdff', ['DISC ARMED! THROW IT, IT COMES BACK!', 'IDENTITY DISC! SLICE THE WHOLE RING!']]
   };
   const callout = pickupCallouts[p.kind];
   if (callout) {
     shipCallout(callout[0], callout[1]);
     say('pickup-' + p.kind, callout[2], 1, 10);
   }
-  if (p.kind === 'echo') {
+  if (p.kind === 'disc') {
+    discCharges = DISC_THROWS;
+    updateTripleUI();
+    burst(p.angle, p.z, { color: '232,253,255', bitColor: '#e8fdff', label: 'DISC!', labelColor: '#ffffff' });
+  } else if (p.kind === 'echo') {
     echoTimer = ECHO_DURATION;
     updateTripleUI();
     burst(p.angle, p.z, { color: '180,255,90', bitColor: '#b4ff5a', label: 'ECHO!', labelColor: '#e2ffb8' });
@@ -2548,6 +2698,7 @@ function updateTripleUI() {
   if (shieldTimer > 0) lines.push('SHIELD ' + shieldTimer.toFixed(1) + 's');
   if (overdriveTimer > 0) lines.push('OVERDRIVE ' + overdriveTimer.toFixed(1) + 's');
   if (echoTimer > 0) lines.push('ECHO ' + echoTimer.toFixed(1) + 's');
+  if (discCharges > 0) lines.push('DISC x' + discCharges);
   el.textContent = lines.join('\n');
   el.style.display = lines.length ? 'block' : 'none';
 }
@@ -2696,6 +2847,20 @@ function update(dt) {
     // of ending the fight outright
     if (boss && boss.alive) {
       boss.z -= 0.025 * dt;
+      if (boss.form === 'recognizer') {
+        boss.angle = normalizeAngle(Math.sin(t * 0.5 + boss.seed) * 1.3);
+        boss.stompTimer -= dt;
+        if (boss.stompTimer <= 0) {
+          boss.lunge = 0.45;
+          boss.stompTimer = 4 + Math.random() * 2;
+          triggerShake(7, 0.3);
+          playBass(42, 0.45);
+        }
+        if (boss.lunge > 0) {
+          boss.lunge -= dt;
+          boss.z -= 0.55 * dt;
+        }
+      }
       boss.fireTimer -= dt;
       if (boss.fireTimer <= 0 && boss.z < 0.9) {
         for (const off of [-0.22, 0, 0.22]) {
@@ -2829,6 +2994,8 @@ function update(dt) {
       b.z += shipClass().boltSpeed * dt;
     }
     bolts = bolts.filter(b => b.z < 1.1);
+
+    updateDisc(dt);
 
     // bolts can shoot spikes down during a warp
     for (const b of bolts) {
@@ -3116,6 +3283,7 @@ function draw() {
     drawBoss();
     drawPowerups();
     drawCores();
+    drawDisc();
     drawBolts();
     drawEnemyBolts();
     drawParticles();
@@ -3430,10 +3598,65 @@ function drawEnemyBolts() {
   ctx.restore();
 }
 
+function drawRecognizer(pt, size) {
+  // the Tron Recognizer: two legs, a heavy top bar and a head with a slit
+  // eye that flares just before it stomps
+  const S = size * 1.1;
+  const warn = boss.stompTimer < 0.9 || boss.lunge > 0;
+  ctx.save();
+  ctx.translate(pt.x, pt.y + Math.sin(t * 3) * S * 0.03);
+  ctx.strokeStyle = '#ff2a2a';
+  ctx.shadowColor = '#ff2a2a';
+  ctx.shadowBlur = 22;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  // left leg, top bar, right leg (one outline)
+  ctx.moveTo(-S * 1.0, S * 0.95);
+  ctx.lineTo(-S * 1.0, -S * 0.25);
+  ctx.lineTo(-S * 0.75, -S * 0.6);
+  ctx.lineTo(S * 0.75, -S * 0.6);
+  ctx.lineTo(S * 1.0, -S * 0.25);
+  ctx.lineTo(S * 1.0, S * 0.95);
+  ctx.lineTo(S * 0.7, S * 0.95);
+  ctx.lineTo(S * 0.7, -S * 0.15);
+  ctx.lineTo(-S * 0.7, -S * 0.15);
+  ctx.lineTo(-S * 0.7, S * 0.95);
+  ctx.closePath();
+  ctx.stroke();
+  // head hanging under the bar
+  ctx.beginPath();
+  ctx.moveTo(-S * 0.3, -S * 0.15);
+  ctx.lineTo(-S * 0.22, S * 0.22);
+  ctx.lineTo(S * 0.22, S * 0.22);
+  ctx.lineTo(S * 0.3, -S * 0.15);
+  ctx.stroke();
+  // facet lines on the bar and legs
+  ctx.lineWidth = 1.2;
+  ctx.globalAlpha = 0.6;
+  for (const x of [-0.85, 0.85]) {
+    ctx.beginPath();
+    ctx.moveTo(x * S, -S * 0.2);
+    ctx.lineTo(x * S, S * 0.95);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.moveTo(-S * 0.75, -S * 0.38);
+  ctx.lineTo(S * 0.75, -S * 0.38);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  // eye
+  ctx.fillStyle = warn ? '#ffffff' : '#ffd23f';
+  ctx.shadowColor = warn ? '#ffffff' : '#ffd23f';
+  ctx.shadowBlur = warn ? 30 : 14;
+  ctx.fillRect(-S * 0.16, S * 0.02, S * 0.32, S * (warn ? 0.09 : 0.05));
+  ctx.restore();
+}
+
 function drawBoss() {
   if (!boss || !boss.alive) return;
   const pt = pointOnRing(boss.angle, boss.z);
   const size = Math.max(10, 50 * (1 - boss.z) + 14);
+  if (boss.form === 'recognizer') { drawRecognizer(pt, size); return; }
   ctx.save();
   ctx.translate(pt.x, pt.y);
   ctx.rotate(t * 0.3);
@@ -3471,7 +3694,20 @@ function drawPowerups() {
     const size = Math.max(4, 17 * (1 - p.z) + 5);
     ctx.save();
     ctx.translate(pt.x, pt.y);
-    if (p.kind === 'echo') {
+    if (p.kind === 'disc') {
+      // a small identity disc, edge-on and spinning
+      ctx.scale(1, 0.55 + Math.sin(t * 5) * 0.35);
+      ctx.strokeStyle = '#e8fdff';
+      ctx.shadowColor = '#50e6ff';
+      ctx.shadowBlur = 18;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, size, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, size * 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (p.kind === 'echo') {
       // lime ripples: three rings drifting apart and back, like a reverb
       ctx.strokeStyle = '#b4ff5a';
       ctx.shadowColor = '#b4ff5a';
@@ -3812,6 +4048,7 @@ function drawBolts() {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   for (const b of bolts) {
+    if (b.hidden) continue;
     const p1 = pointOnRing(b.angle, Math.max(0, b.z - 0.05));
     const p2 = pointOnRing(b.angle, Math.min(1, b.z + 0.02));
     ctx.beginPath();

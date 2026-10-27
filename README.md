@@ -231,6 +231,24 @@ While playing, `drawPortrait()` shows the live wireframe in `#portrait`
 (red glitch when hit). The camera image never leaves the device. The
 commander's lines swap PILOT/PILOTO for the name.
 
+**Identity disc** — `disc` pickup sets `discCharges = DISC_THROWS` (3);
+while charged, `fire()` calls `throwDisc()` instead of shooting (when no
+disc is in flight). `updateDisc()` flies it out to z 0.5, sweeps one full
+turn of the ring, then flies it back; every enemy (and the boss) it
+touches gets one hit per throw by spawning a `hidden` bolt on it, so all
+hit/kill/score logic stays in the normal bolt collision code.
+
+**Recognizer** — `spawnBoss()` sets `boss.form = 'recognizer'` for level
+2's boss and every 6th Rift depth: drawn by `drawRecognizer()` (legs, bar,
+head, slit eye), it sways around the tube and stomps forward
+(`stompTimer`/`lunge`), its eye flaring white just before.
+
+**OVERSEER** — the rival AI. `hack(key, lines, …)` sends a line through
+`say()` and marks it `comms.hack`: the box turns red, signs as
+`> OVERSEER`, glitches characters and plays `playHack()`. Breaks in for
+Recognizers, the final boss, the Rift, very low hull and (half the time)
+on arriving in a new level, where it replaces the commander's line.
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups
