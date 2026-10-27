@@ -682,6 +682,34 @@
     flex-wrap: wrap;
   }
   #toggles button { margin-top: 14px; margin-left: 0; }
+  #hudcoins { float: right; color: #ffd23f; text-shadow: 0 0 6px #ffd23f; }
+  #wallet { font-size: 12px !important; color: #ffd23f; text-shadow: 0 0 8px #ffd23f; opacity: 1 !important; margin: 0 0 14px !important; }
+  #shoplist { display: flex; flex-direction: column; gap: 8px; max-width: 460px; margin: 0 auto 14px; }
+  .shoprow {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 10px;
+    align-items: center;
+    text-align: left;
+    border: 1px solid rgba(60, 138, 255, 0.35);
+    padding: 8px 10px;
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+  .shoprow .what { opacity: 0.6; font-size: 7px; grid-column: 1; }
+  .shoprow .pips { color: #ffd23f; letter-spacing: 3px; }
+  .shoprow button {
+    grid-row: 1 / span 3;
+    grid-column: 2;
+    background: transparent;
+    border: 1px solid #ffd23f;
+    color: #ffd23f;
+    font-family: inherit;
+    font-size: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+  }
+  .shoprow button:disabled { opacity: 0.35; cursor: default; }
   #toast {
     position: fixed;
     top: 12%;
@@ -981,7 +1009,7 @@
     <span><span id="levellabel">LVL</span> <span id="levelnum">1</span></span>
     <span>SCORE <span id="score">0</span></span>
   </div>
-  <div id="hudkills"><span id="objlabel">KILLS</span> <span id="kills">0</span>/<span id="killTarget">20</span></div>
+  <div id="hudkills"><span id="objlabel">KILLS</span> <span id="kills">0</span>/<span id="killTarget">20</span><span id="hudcoins"></span></div>
   <div id="hudrun"></div>
   <div id="hudtriple"></div>
   <div id="hudzap"></div>
@@ -1009,6 +1037,7 @@
       <button id="riftStart" class="riftBtn">ENTER THE RIFT</button>
       <button data-go="multi">MULTIPLAYER &gt;</button>
       <button data-go="hangar">HANGAR &gt;</button>
+      <button data-go="shop" id="shopBtn">UPGRADES &gt;</button>
       <button data-go="settings">SETTINGS &gt;</button>
     </div>
   </section>
@@ -1051,6 +1080,13 @@
       <button id="cyclesBtn">DAEMONS</button>
       <p class="menunote">RACE ON THE BUS. LEAVE WALLS, DON'T SEGFAULT</p>
     </div>
+    <button class="back" data-go="menu">&lt; BACK</button>
+  </section>
+  <section class="screen" data-screen="shop">
+    <h2>UPGRADES</h2>
+    <p id="wallet"></p>
+    <div id="shoplist"></div>
+    <p class="menunote">COINS ARE EARNED BY PLAYING: FLY OVER THEM, BEAT BOSSES, CLEAR LEVELS</p>
     <button class="back" data-go="menu">&lt; BACK</button>
   </section>
   <section class="screen" data-screen="settings">
@@ -1539,7 +1575,10 @@ function padPull() {
 
 function spawnTrackItem() {
   const r = Math.random();
-  const kind = r < 0.33 ? 'boost' : r < 0.58 ? 'brake' : r < 0.8 ? 'hoop' : 'portal';
+  // coin rows are the most common thing on the floor
+  if (r < 0.4) { spawnCoinRow(); return; }
+  const r2 = Math.random();
+  const kind = r2 < 0.33 ? 'boost' : r2 < 0.58 ? 'brake' : r2 < 0.8 ? 'hoop' : 'portal';
   // somewhere on the ship's arc: 3 to 9 o'clock (anywhere during lock-in)
   const angle = lockinTimer > 0 ? normalizeAngle(Math.random() * Math.PI * 2)
     : normalizeAngle(Math.PI + (Math.random() - 0.5) * Math.PI * 0.95);
@@ -1597,7 +1636,7 @@ function updateTrack(dt) {
     trackTimer -= dt;
     if (trackTimer <= 0) {
       spawnTrackItem();
-      trackTimer = 3.5 + Math.random() * 3;
+      trackTimer = (env === 'space' ? 1.8 : 2.6) + Math.random() * 2.4;
     }
   }
   const speed = effectiveTunnelSpeed() * warpBoost() * padSpeed();
@@ -1621,6 +1660,17 @@ function updateTrack(dt) {
       if (!it.done && it.z <= 0.03) { it.done = true; shipCallout('VENT MISSED', '#ff8866'); }
       continue;
     }
+    if (it.kind === 'coin') {
+      if (!it.done && it.z <= 0.04) {
+        it.done = true;
+        if (inShipLane(it.angle, TRACK_HIT + 0.08 * up('magnet'))) {
+          addCoins(1);
+          it.got = true;
+          playZap();
+        }
+      }
+      continue;
+    }
     if (it.z <= 0.03 && !it.done) {
       it.done = true;
       if (inShipLane(it.angle, TRACK_HIT)) triggerTrackItem(it);
@@ -1641,6 +1691,24 @@ function drawTrackItems() {
   for (const it of trackItems) {
     if (it.z < 0 || it.z > 1) continue;
     const near = 1 - it.z;
+    if (it.kind === 'coin') {
+      if (it.done) continue;
+      // a spinning gold coin standing just off the floor
+      const pt = pointOnRing(it.angle, it.z);
+      const x = pt.x + (CX - pt.x) * 0.05, y = pt.y + (CY - pt.y) * 0.05;
+      const r = 3 + 12 * near;
+      ctx.beginPath();
+      ctx.ellipse(x, y, r * Math.abs(Math.cos(t * 4 + it.z * 20)) + 1, r, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,210,63,0.35)';
+      ctx.fill();
+      ctx.strokeStyle = '#ffd23f';
+      ctx.shadowColor = '#ffd23f';
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      continue;
+    }
     if (it.kind === 'vent') {
       if (it.done) continue;
       // a glowing exhaust vent set into the trench floor, with a target ring
@@ -1737,6 +1805,74 @@ function drawTrackItems() {
     ctx.fillStyle = `rgba(200,120,255,${0.25 * teleportFlash})`;
     ctx.fillRect(0, 0, W, H);
   }
+}
+
+// ---------- Coins + upgrades (saved as vortex-coins / vortex-upgrades) ----------
+// Coins come in short rows along a lane (fly over them), plus bonuses for
+// bosses and cleared levels. They're spent on permanent upgrades in the
+// UPGRADES screen; nothing here can be bought with real money.
+const UPGRADES = {
+  plasma:  { name: 'PLASMA CELLS', what: '+15% PLASMA SHIELD PER LEVEL', max: 5, cost: 60 },
+  charge:  { name: 'LONG CHARGE',  what: 'POWER-UPS LAST 12% LONGER PER LEVEL', max: 5, cost: 50 },
+  magnet:  { name: 'COIN MAGNET',  what: 'COLLECT COINS FROM A WIDER LANE', max: 5, cost: 40 },
+  bomb:    { name: 'EXTRA BOMB',   what: '+1 BOMB PER LEVEL', max: 2, cost: 150 },
+  core:    { name: 'POWER CORE',   what: 'LOCK-IN CHARGES 15% FASTER PER LEVEL', max: 5, cost: 70 }
+};
+let coins = 0;
+let upgrades = {};
+let runCoins = 0;
+try {
+  coins = parseInt(localStorage.getItem('vortex-coins'), 10) || 0;
+  upgrades = JSON.parse(localStorage.getItem('vortex-upgrades') || '{}') || {};
+} catch (e) { /* storage unavailable */ }
+function up(id) { return upgrades[id] || 0; }
+function upgradeCost(id) { return UPGRADES[id].cost * (up(id) + 1); }
+function saveWallet() {
+  try {
+    localStorage.setItem('vortex-coins', String(coins));
+    localStorage.setItem('vortex-upgrades', JSON.stringify(upgrades));
+  } catch (e) { /* ignore */ }
+}
+function addCoins(n) {
+  coins += n;
+  runCoins += n;
+  saveWallet();
+  document.getElementById('hudcoins').textContent = 'COINS ' + runCoins;
+}
+// how much longer timed power-ups last
+function chargeMul() { return 1 + 0.12 * up('charge'); }
+
+function renderShop() {
+  document.getElementById('wallet').textContent = 'COINS ' + coins;
+  const list = document.getElementById('shoplist');
+  list.innerHTML = '';
+  for (const [id, u] of Object.entries(UPGRADES)) {
+    const lvl = up(id), maxed = lvl >= u.max, cost = upgradeCost(id);
+    const row = document.createElement('div');
+    row.className = 'shoprow';
+    row.innerHTML = `<span>${u.name}</span><span class="pips">${'#'.repeat(lvl)}${'-'.repeat(u.max - lvl)}</span><span class="what">${u.what}</span>`;
+    const btn = document.createElement('button');
+    btn.textContent = maxed ? 'MAX' : cost + ' C';
+    btn.disabled = maxed || coins < cost;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (coins < cost || maxed) return;
+      coins -= cost;
+      upgrades[id] = lvl + 1;
+      saveWallet();
+      playPowerUp();
+      renderShop();
+    });
+    row.appendChild(btn);
+    list.appendChild(row);
+  }
+}
+
+// coin rows: 5 coins in one lane, spaced down the tunnel
+function spawnCoinRow() {
+  const angle = lockinTimer > 0 ? normalizeAngle(Math.random() * Math.PI * 2)
+    : normalizeAngle(Math.PI + (Math.random() - 0.5) * Math.PI * 0.95);
+  for (let k = 0; k < 5; k++) trackItems.push({ kind: 'coin', angle, z: 1 + k * 0.05 });
 }
 
 // power: charged by kills, spent on lock-in mode
@@ -3167,7 +3303,8 @@ function showRank(elId, won) {
   const el = document.getElementById(elId);
   el.style.color = RANK_COLORS[r.letter];
   el.style.textShadow = '0 0 24px ' + RANK_COLORS[r.letter];
-  el.innerHTML = r.letter + '<small>ACCURACY ' + Math.round(r.accuracy * 100) + '%   DAMAGE TAKEN ' + Math.round(runDamage) + '</small>';
+  el.innerHTML = r.letter + '<small>ACCURACY ' + Math.round(r.accuracy * 100) + '%   DAMAGE TAKEN ' + Math.round(runDamage)
+    + '<br>+' + runCoins + ' COINS (' + coins + ' TOTAL)</small>';
   if (r.letter === 'S') unlockAchievement('rankS');
   return r;
 }
@@ -3265,10 +3402,12 @@ function startGame(continuing, mode) {
   nextMinibossIndex = 0;
   hullMax = shipClass().hull;
   hull = hullMax;
-  plasmaMax = Math.round(hullMax * PLASMA_FRACTION);
+  plasmaMax = Math.round(hullMax * PLASMA_FRACTION * (1 + 0.15 * up('plasma')));
   plasma = plasmaMax;
   plasmaHitAt = -99;
   power = 0;
+  if (!continuing) runCoins = 0;
+  document.getElementById('hudcoins').textContent = runCoins ? 'COINS ' + runCoins : '';
   lockinTimer = 0;
   lockinBlend = 0;
   trackItems = [];
@@ -3277,6 +3416,7 @@ function startGame(continuing, mode) {
   lockinAnnounced = false;
   shipLane = Math.PI;
   shipLaneVel = 0;
+  aimAngle = Math.PI; // start aimed down the floor, so the ship sits bottom-centre
   // a continued (New Game Plus) run keeps its stats so the rank covers it all
   if (!continuing) { runShots = 0; runHits = 0; runDamage = 0; }
   damageFlash = 0;
@@ -3847,7 +3987,7 @@ function shipCallout(text, color) {
 // Called whenever a level (or a Rift boss gate) begins: refills the
 // superzapper and applies the ship class's level-start perks.
 function onLevelStart() {
-  zapperCharges = 1;
+  zapperCharges = 1 + up('bomb');
   setEnv(routeEnv(), true);
   // the level banner names where this level starts
   const lb = document.getElementById('levelbanner');
@@ -3974,22 +4114,22 @@ function collectPowerup(p) {
     updateTripleUI();
     burst(p.angle, p.z, { color: '232,253,255', bitColor: '#e8fdff', label: 'DISC!', labelColor: '#ffffff' });
   } else if (p.kind === 'echo') {
-    echoTimer = ECHO_DURATION;
+    echoTimer = ECHO_DURATION * chargeMul();
     updateTripleUI();
     burst(p.angle, p.z, { color: '180,255,90', bitColor: '#b4ff5a', label: 'ECHO!', labelColor: '#e2ffb8' });
   } else if (p.kind === 'shield') {
-    shieldTimer = SHIELD_DURATION;
+    shieldTimer = SHIELD_DURATION * chargeMul();
     updateTripleUI();
     burst(p.angle, p.z, { color: '80,230,255', bitColor: '#50e6ff', label: 'SHIELD!', labelColor: '#b8f6ff' });
   } else if (p.kind === 'overdrive') {
-    overdriveTimer = OVERDRIVE_DURATION;
+    overdriveTimer = OVERDRIVE_DURATION * chargeMul();
     autoFireTimer = 0;
     updateTripleUI();
     burst(p.angle, p.z, { color: '255,140,40', bitColor: '#ff8c28', label: 'OVERDRIVE!', labelColor: '#ffc080' });
   } else if (p.kind === 'nova') {
     triggerNova();
   } else if (p.kind === 'star') {
-    tripleLaserTimer = TRIPLE_LASER_DURATION * shipClass().tripleMul;
+    tripleLaserTimer = TRIPLE_LASER_DURATION * shipClass().tripleMul * chargeMul();
     updateTripleUI();
     burst(p.angle, p.z, {
       color: '255,255,255',
@@ -4377,7 +4517,7 @@ function update(dt) {
           killCount += 1;
           killStreak += 1;
           versusKill();
-          power = Math.min(100, power + POWER_PER_KILL);
+          power = Math.min(100, power + POWER_PER_KILL * (1 + 0.15 * up('core')));
           updatePlasmaUI();
           if (killStreak > 0 && killStreak % 10 === 0) {
             shipCallout(killStreak + ' STREAK!', '#3f6');
@@ -4443,6 +4583,7 @@ function update(dt) {
             bossActive = false;
             boss = null;
             updateBossUI();
+            addCoins(wasMini ? 10 : 25);
             if (!wasMini) {
               setMusicTrack(gameplayTrack());
               if (bossFightDamage === 0) unlockAchievement('untouchable');
@@ -6687,6 +6828,8 @@ function showScreen(name) {
   titleScreen = name;
   document.querySelectorAll('#title .screen').forEach(sc => sc.classList.toggle('active', sc.dataset.screen === name));
   if (name === 'menu') updateLoadout();
+  if (name === 'shop') renderShop();
+  document.getElementById('shopBtn').textContent = 'UPGRADES (' + coins + ' C) >';
   document.getElementById('title').scrollTop = 0;
 }
 function updateLoadout() {

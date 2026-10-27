@@ -325,6 +325,14 @@ enemies (3 hp).
 grayscale + invert + contrast filter on the canvas turns everything into
 black ink on white, easing in and out (it overrides the hoop hue trip).
 
+**Coins + upgrades** — `coin` track items come in rows of 5 down one lane
+(`spawnCoinRow()`, the most common floor item); fly over them (lane widened
+by the magnet upgrade) for `addCoins(1)`; bosses pay 10/25. Coins are
+saved (`vortex-coins`) and spent on the UPGRADES screen (`renderShop()`,
+`UPGRADES`, saved as `vortex-upgrades`): PLASMA CELLS, LONG CHARGE
+(`chargeMul()` on timed pickups), COIN MAGNET, EXTRA BOMB, POWER CORE.
+Results show the run's coins. Coins are only ever earned by playing.
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups
