@@ -473,6 +473,63 @@
     text-shadow: 0 0 6px #ffe14d;
   }
   #dailyBtn.challenged { background: #ffe14d; color: #000; text-shadow: none; box-shadow: 0 0 14px #ffe14d; }
+  #coopBtn {
+    display: block;
+    margin: 10px auto 0;
+    background: transparent;
+    border: 1px solid #3f6;
+    color: #3f6;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 9px 12px;
+    cursor: pointer;
+    text-shadow: 0 0 6px #3f6;
+  }
+  /* co-op lobby: the QR code phones scan to join */
+  #lobby {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(440px, calc(100vw - 32px));
+    box-sizing: border-box;
+    background: rgba(5, 0, 15, 0.94);
+    border: 1px solid #3f6;
+    box-shadow: 0 0 24px rgba(63, 255, 102, 0.3);
+    padding: 20px;
+    text-align: center;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    color: #3f6;
+    display: none;
+    z-index: 1000; /* above the CRT scanlines, which would break QR scanning */
+  }
+  #lobby h2 { font-size: 14px; letter-spacing: 3px; margin: 0 0 12px; text-shadow: 0 0 10px #3f6; }
+  #lobby p { font-size: 8px; line-height: 1.8; margin: 8px 0; opacity: 0.8; }
+  #qrbox {
+    display: inline-block;
+    background: #fff;
+    padding: 8px;
+    margin: 8px 0;
+    color: #000;
+    font-size: 8px;
+    min-width: 120px;
+    min-height: 120px;
+    line-height: 120px;
+  }
+  #qrbox svg { display: block; }
+  #lobbylink { word-break: break-all; }
+  #lobbyplayers { font-size: 9px; line-height: 2; margin: 10px 0; }
+  #lobbyClose {
+    background: #3f6;
+    border: none;
+    color: #000;
+    font-family: inherit;
+    font-size: 10px;
+    letter-spacing: 2px;
+    padding: 10px 18px;
+    cursor: pointer;
+  }
   #toast {
     position: fixed;
     top: 12%;
@@ -686,6 +743,7 @@
   </div>
   <button id="riftStart" class="riftBtn">ENTER THE RIFT</button>
   <button id="dailyBtn">DAILY TUNNEL</button>
+  <button id="coopBtn">CO-OP: ADD PLAYERS</button>
   <button id="crtToggle" class="selected">CRT: ON</button>
   <button id="langToggle">COMMS: EN</button>
   <div id="jackin">
@@ -718,6 +776,14 @@
 </div>
 <button id="zapBtn">ZAP</button>
 <div id="toast"></div>
+<div id="lobby">
+  <h2>CO-OP LINK</h2>
+  <p>SCAN WITH A PHONE TO JOIN AS AN EXTRA GUNNER (UP TO 3)</p>
+  <div id="qrbox">STARTING LINK...</div>
+  <p id="lobbylink"></p>
+  <div id="lobbyplayers"></div>
+  <button id="lobbyClose">DONE</button>
+</div>
 <canvas id="digitize"></canvas>
 <canvas id="portrait" width="132" height="100"></canvas>
 <div id="briefing"><div id="briefingtitle"></div><div id="briefingtext"></div></div>
@@ -738,6 +804,8 @@
   <div class="resultBtns"><button class="clipBtn">SAVE CLIP</button><button class="shareBtn">SHARE</button></div>
 </div>
 
+<script src="lib/peerjs.min.js"></script>
+<script src="lib/qrcode.js"></script>
 <script>
 // Build the title out of individually flickering characters, bookended by
 // blinking terminal-style underscores, like an old CRT losing sync.
@@ -1163,6 +1231,7 @@ function damageShip(amount) {
     return;
   }
   hull -= amount;
+  netBroadcast({ t: 'hit' });
   runDamage += amount;
   bossFightDamage += amount;
   shipHitWobble = 1;
@@ -3651,6 +3720,7 @@ function draw() {
     drawAimTrail();
     drawAimLine();
     drawEchoGhosts();
+    drawCoPlayers();
     if (!shipDerezzed) drawShip();
     drawVoxels();
     ctx.restore();
@@ -4413,8 +4483,9 @@ function drawBolts() {
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
-    ctx.strokeStyle = b.echo ? '#b4ff5a' : '#a855ff';
-    ctx.shadowColor = b.echo ? '#b4ff5a' : '#a855ff';
+    const boltColor = b.owner !== undefined ? COOP_COLORS[b.owner] : b.echo ? '#b4ff5a' : '#a855ff';
+    ctx.strokeStyle = boltColor;
+    ctx.shadowColor = boltColor;
     ctx.shadowBlur = 12;
     ctx.lineWidth = 2;
     ctx.stroke();
@@ -4672,9 +4743,10 @@ function findAimTarget() {
   return best;
 }
 
-function drawBullseye(x, y, r, locked) {
+function drawBullseye(x, y, r, locked, color) {
   // yellow bullseye; a lock turns it white-hot with a red centre and ticks
-  const col = locked ? '#fff27a' : 'rgba(255,225,77,0.9)';
+  // (co-op gunners pass their own colour)
+  const col = color || (locked ? '#fff27a' : 'rgba(255,225,77,0.9)');
   ctx.save();
   ctx.translate(x, y);
   ctx.strokeStyle = col;
@@ -4746,6 +4818,167 @@ function drawAimLine() {
   }
 }
 
+// ---------- Co-op link (multiplayer stage 1) ----------
+// The host screen opens a PeerJS peer and shows a QR code for
+// pad.html?host=<its id>. Each phone that connects becomes an extra gunner
+// on this screen: it sends aim / fire / zap, and gets state back. The game
+// runs entirely here; phones only send input. Team play: shared hull,
+// score, zapper and power-ups (except the disc and echo, which stay with
+// the main ship).
+const COOP_COLORS = ['#3f6', '#ff8c28', '#22ddff'];
+const COOP_MAX = 3;
+let netPeer = null;
+let netId = '';
+let coPlayers = []; // { conn, slot, name, color, aim, x, vx, lastFireMsg, fireCd }
+let netStateTimer = 0;
+
+// ?peerhost=host:port: use a self-hosted PeerJS server (local testing)
+function peerOptions() {
+  const m = /[?&]peerhost=([^&]+)/.exec(location.search);
+  if (!m) return { debug: 0 };
+  const [host, port] = decodeURIComponent(m[1]).split(':');
+  return { host, port: parseInt(port, 10) || 9000, path: '/', secure: false, debug: 0, config: { iceServers: [] } };
+}
+
+function padUrl() {
+  const url = new URL('pad.html', location.href);
+  url.search = '';
+  url.searchParams.set('host', netId);
+  const ph = /[?&]peerhost=([^&]+)/.exec(location.search);
+  if (ph) url.searchParams.set('peerhost', decodeURIComponent(ph[1]));
+  return url.toString();
+}
+
+function openLobby() {
+  document.getElementById('lobby').style.display = 'block';
+  renderLobby();
+  if (netPeer || typeof Peer === 'undefined') {
+    if (typeof Peer === 'undefined') document.getElementById('qrbox').textContent = 'LINK UNAVAILABLE';
+    return;
+  }
+  const code = Math.random().toString(36).slice(2, 7);
+  netPeer = new Peer('vortex-' + code, peerOptions());
+  netPeer.on('open', (id) => {
+    netId = id;
+    renderLobby();
+  });
+  netPeer.on('connection', onPadConnection);
+  netPeer.on('error', (err) => {
+    if (err.type === 'unavailable-id') { netPeer.destroy(); netPeer = null; openLobby(); return; }
+    document.getElementById('qrbox').textContent = 'LINK ERROR';
+    document.getElementById('lobbylink').textContent = 'COULD NOT REACH THE LINK SERVER (' + err.type + ')';
+  });
+}
+
+function renderLobby() {
+  const box = document.getElementById('qrbox');
+  if (netId && typeof qrcode !== 'undefined') {
+    const qr = qrcode(0, 'M');
+    qr.addData(padUrl());
+    qr.make();
+    box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0 });
+    box.style.lineHeight = '0';
+    document.getElementById('lobbylink').textContent = padUrl();
+  }
+  document.getElementById('lobbyplayers').innerHTML = coPlayers.length
+    ? coPlayers.map(cp => `<span style="color:${cp.color}">P${cp.slot + 2} ${cp.name}</span>`).join('<br>')
+    : 'NO GUNNERS YET';
+}
+
+function onPadConnection(conn) {
+  conn.on('data', (msg) => {
+    if (!msg || typeof msg !== 'object') return;
+    let cp = coPlayers.find(c => c.conn === conn);
+    if (msg.t === 'hello' && !cp) {
+      const used = coPlayers.map(c => c.slot);
+      const slot = [0, 1, 2].find(i => !used.includes(i));
+      if (slot === undefined || coPlayers.length >= COOP_MAX) { conn.send({ t: 'full' }); return; }
+      const name = String(msg.name || 'GUNNER').toUpperCase().replace(/[^A-Z0-9 ÑÜ_-]/g, '').slice(0, 10) || 'GUNNER';
+      cp = { conn, slot, name, color: COOP_COLORS[slot], aim: 0, x: 0, vx: 0, lastFireMsg: -9, fireCd: 0, lastSeen: t };
+      coPlayers.push(cp);
+      conn.send({ t: 'welcome', slot, color: cp.color, name });
+      showToast('P' + (slot + 2) + ' ' + name + ' JACKED IN');
+      say('coopJoin', { en: name + ' IS ON THE GUNS. WELCOME, ' + name + '!', es: name + ' ESTA EN LOS CAÑONES. ¡BIENVENIDO, ' + name + '!' }, 2, 0);
+      renderLobby();
+      return;
+    }
+    if (!cp) return;
+    cp.lastSeen = t;
+    if (msg.t === 'bye') { conn.close(); dropCoPlayer(cp); return; }
+    if (msg.t === 'aim' && typeof msg.a === 'number') cp.aim = normalizeAngle(msg.a);
+    else if (msg.t === 'fire') cp.lastFireMsg = t;
+    else if (msg.t === 'zap') superzap();
+  });
+  conn.on('close', () => {
+    const cp = coPlayers.find(c => c.conn === conn);
+    if (cp) dropCoPlayer(cp);
+  });
+}
+
+function dropCoPlayer(cp) {
+  if (!coPlayers.includes(cp)) return;
+  coPlayers = coPlayers.filter(c => c !== cp);
+  showToast('P' + (cp.slot + 2) + ' ' + cp.name + ' DISCONNECTED');
+  renderLobby();
+}
+
+function netBroadcast(msg) {
+  for (const cp of coPlayers) { if (cp.conn.open) cp.conn.send(msg); }
+}
+
+// per frame: co-gunners slide to their aim and fire while their pad is held
+function updateCoPlayers(dt) {
+  if (!coPlayers.length) return;
+  // pads ping every second; a silent one (closed tab, lost signal) drops out
+  for (const cp of coPlayers.slice()) { if (t - cp.lastSeen > 6) dropCoPlayer(cp); }
+  netStateTimer -= dt;
+  if (netStateTimer <= 0) {
+    netStateTimer = 0.25;
+    netBroadcast({ t: 'state', hull: Math.max(0, hull / hullMax), score, st: state, zap: zapperCharges });
+  }
+  if (state !== 'playing') return;
+  for (const cp of coPlayers) {
+    const target = Math.sin(cp.aim) * Math.min(W * 0.3, H * 0.45);
+    cp.vx += ((target - cp.x) * 38 - cp.vx * 9) * dt;
+    cp.x += cp.vx * dt;
+    cp.fireCd -= dt;
+    if (t - cp.lastFireMsg < 0.3 && cp.fireCd <= 0) {
+      cp.fireCd = 0.16;
+      const angles = tripleLaserTimer > 0 ? [-0.16, 0, 0.16].map(off => normalizeAngle(cp.aim + off)) : [cp.aim];
+      for (const angle of angles) bolts.push({ angle, z: 0.04, owner: cp.slot });
+      pulses.push({ startTime: t, angle: cp.aim });
+      playZap();
+    }
+  }
+}
+
+function drawCoPlayers() {
+  if (!coPlayers.length || state !== 'playing') return;
+  const base = Math.min(W, H) * 0.095;
+  for (const cp of coPlayers) {
+    // their firing line + bullseye, in their colour
+    ctx.fillStyle = hexToRgba(cp.color, 0.8);
+    for (let z = 0.06; z < 0.5; z += 0.05) {
+      const pt = pointOnRing(cp.aim, z);
+      const d = 4 - z * 4;
+      ctx.fillRect(pt.x - d / 2, pt.y - d / 2, d, d);
+    }
+    const bp = pointOnRing(cp.aim, 0.45);
+    drawBullseye(bp.x, bp.y, 12, false, cp.color);
+    // their ship: an interceptor flying in formation above the main ship
+    const sx = CX + cp.x;
+    const sy = H - Math.min(W, H) * 0.11 - base * (1.25 + cp.slot * 0.55);
+    drawShip({ ghost: true, classIndex: 1, x: sx, y: sy, s: base * 0.6, lean: Math.max(-0.35, Math.min(0.35, cp.vx * 0.0011)),
+               palette: { main: cp.color, glow: cp.color } });
+    ctx.save();
+    ctx.font = "8px 'Press Start 2P', 'Courier New', monospace";
+    ctx.textAlign = 'center';
+    ctx.fillStyle = cp.color;
+    ctx.fillText('P' + (cp.slot + 2) + ' ' + cp.name, sx, sy - base * 0.75);
+    ctx.restore();
+  }
+}
+
 // daily tunnel, clip and share buttons (wired last: they use the sections above)
 updateDailyBtn();
 document.getElementById('dailyBtn').addEventListener('click', (e) => {
@@ -4764,6 +4997,13 @@ for (const btn of document.querySelectorAll('.clipBtn')) {
 for (const btn of document.querySelectorAll('.shareBtn')) {
   btn.addEventListener('click', (e) => { e.stopPropagation(); shareResult(btn); });
 }
+document.getElementById('coopBtn').addEventListener('click', (e) => { e.stopPropagation(); openLobby(); });
+for (const ev of ['click', 'mousedown', 'touchstart']) {
+  document.getElementById('lobby').addEventListener(ev, (e) => e.stopPropagation());
+}
+document.getElementById('lobbyClose').addEventListener('click', () => {
+  document.getElementById('lobby').style.display = 'none';
+});
 
 // ---------- Loop ----------
 // live preview of the selected ship (class + colour) on the title screen
@@ -4786,6 +5026,7 @@ function loop(now) {
   update(dt);
   draw();
   updateJackIn(dt);
+  updateCoPlayers(dt);
   drawPortrait();
   updateClipRecording(dt);
   if (state === 'title') drawShipPreview();

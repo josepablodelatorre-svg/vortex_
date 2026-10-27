@@ -377,6 +377,24 @@ There's no test suite, but this session's workflow for every change was:
    finishing-blow race condition where two bolts killing the boss in the
    same frame caused a null-dereference).
 
+## Multiplayer
+
+**Co-op link (stage 1)** — CO-OP: ADD PLAYERS opens `#lobby`: the game
+creates a PeerJS peer `vortex-xxxxx` and shows a QR code (`lib/qrcode.js`)
+for `pad.html?host=<id>`. `pad.html` is the phone controller (drag to aim,
+hold to fire, ZAP) and only sends input; the host runs everything.
+Up to 3 `coPlayers` (P2–P4, `COOP_COLORS`) fly interceptors in formation
+above the main ship with their own firing line and bullseye; shared hull,
+score, zapper and power-ups. Host → pad: `welcome`, `state` (4/s), `hit`
+(vibrate). Pads ping every second and are dropped after 6s of silence.
+
+Libraries are bundled in `lib/` (PeerJS 1.5.5, qrcode-generator 2.0.4,
+both MIT, see `lib/LICENSES.txt`) so nothing loads from a CDN. PeerJS's
+free public server introduces the devices; after that they talk directly
+(WebRTC). Networks that block peer-to-peer (some venue/office Wi-Fi) need
+a TURN relay. For local testing, add `?peerhost=127.0.0.1:9000` to point at
+a self-hosted `peer` server (it's passed on to the pad link).
+
 ## Ideas discussed but not yet built
 
 From comparing notes against Vecter (Steam), linefire/VectorSwarm, and a

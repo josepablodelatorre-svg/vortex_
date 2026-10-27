@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>VORTEX Pad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #05000f;
+    color: #3f6;
+    font-family: 'Press Start 2P', 'Courier New', monospace;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #top {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    letter-spacing: 1px;
+    z-index: 2;
+  }
+  #hullbar {
+    position: fixed;
+    top: 36px;
+    left: 12px;
+    right: 12px;
+    height: 8px;
+    border: 1px solid currentColor;
+    padding: 2px;
+    z-index: 2;
+  }
+  #hullfill {
+    height: 100%;
+    width: 100%;
+    background: #3f6;
+  }
+  #pad {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw;
+    height: 100vh;
+  }
+  #zap {
+    position: fixed;
+    right: 16px;
+    bottom: 18px;
+    background: rgba(10, 0, 24, 0.7);
+    border: 1px solid #ff78ff;
+    color: #ff78ff;
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 2px;
+    padding: 18px 20px;
+    text-shadow: 0 0 8px #ff78ff;
+    z-index: 2;
+  }
+  #zap.spent { opacity: 0.25; }
+  #join {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    background: #05000f;
+    z-index: 5;
+    text-align: center;
+    padding: 16px;
+  }
+  #join h1 {
+    font-size: 26px;
+    letter-spacing: 6px;
+    color: #3c8aff;
+    text-shadow: 0 0 16px #3c8aff;
+    margin: 0;
+  }
+  #join p { font-size: 9px; line-height: 1.8; opacity: 0.75; margin: 0; }
+  #name {
+    width: 200px;
+    background: transparent;
+    border: 1px solid #3f6;
+    color: #b9ffcb;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 12px;
+    text-align: center;
+    text-transform: uppercase;
+    outline: none;
+  }
+  #joinBtn {
+    background: #3f6;
+    border: none;
+    color: #000;
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 2px;
+    padding: 14px 22px;
+    box-shadow: 0 0 16px rgba(63, 255, 102, 0.6);
+  }
+  #msg { font-size: 9px; min-height: 1em; color: #ffe14d; }
+</style>
+</head>
+<body>
+<div id="join">
+  <h1>VORTEX</h1>
+  <p>YOU ARE JOINING AS AN EXTRA GUNNER</p>
+  <input id="name" maxlength="10" placeholder="YOUR NAME" autocomplete="off" spellcheck="false">
+  <button id="joinBtn">JACK IN</button>
+  <p id="msg"></p>
+</div>
+<div id="top"><span id="who">CONNECTING...</span><span id="score">0</span></div>
+<div id="hullbar"><div id="hullfill"></div></div>
+<canvas id="pad"></canvas>
+<button id="zap">ZAP</button>
+
+<script src="lib/peerjs.min.js"></script>
+<script>
+// VORTEX phone controller. Scanning the host's QR code opens
+// pad.html?host=<peer id>: this page connects to the game over WebRTC
+// (PeerJS) and becomes an extra gunner. It only sends input; the game
+// itself runs on the host screen. Messages are tiny JSON objects:
+//   pad -> host: hello {name}, aim {a}, fire, zap, ping (every 1s), bye
+//   host -> pad: welcome {slot, color}, state {hull, score, st, zap}, hit
+
+// ?peerhost=host:port points at a self-hosted PeerJS server (testing);
+// otherwise PeerJS's free public server introduces the two devices.
+function peerOptions() {
+  const m = /[?&]peerhost=([^&]+)/.exec(location.search);
+  if (!m) return { debug: 0 };
+  const [host, port] = decodeURIComponent(m[1]).split(':');
+  return { host, port: parseInt(port, 10) || 9000, path: '/', secure: false, debug: 0, config: { iceServers: [] } };
+}
+
+const hostId = (/[?&]host=([^&]+)/.exec(location.search) || [])[1];
+const canvas = document.getElementById('pad');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+let peer = null;
+let conn = null;
+let color = '#3f6';
+let aim = 0;
+let touching = false;
+let lastAimSent = 0;
+let fireTimer = null;
+let lastState = { hull: 1, score: 0, st: 'title', zap: 1 };
+
+function send(msg) {
+  if (conn && conn.open) conn.send(msg);
+}
+
+function setMsg(text) {
+  document.getElementById('msg').textContent = text;
+}
+
+function join() {
+  if (!hostId) { setMsg('NO GAME TO JOIN: SCAN THE QR CODE ON THE GAME SCREEN'); return; }
+  const name = document.getElementById('name').value.trim().toUpperCase().slice(0, 10) || 'GUNNER';
+  try { localStorage.setItem('vortex-pilot', name); } catch (e) { /* ignore */ }
+  setMsg('CONNECTING...');
+  if (peer) peer.destroy();
+  peer = new Peer(peerOptions());
+  peer.on('open', () => {
+    conn = peer.connect(hostId, { reliable: true });
+    conn.on('open', () => send({ t: 'hello', name }));
+    conn.on('data', onData);
+    conn.on('close', () => {
+      document.getElementById('join').style.display = 'flex';
+      setMsg('DISCONNECTED. TAP JACK IN TO RECONNECT.');
+    });
+  });
+  peer.on('error', (err) => {
+    setMsg(err.type === 'peer-unavailable' ? 'GAME NOT FOUND. IS IT STILL OPEN?' : 'CONNECTION FAILED (' + err.type + ')');
+  });
+}
+
+function onData(msg) {
+  if (msg.t === 'welcome') {
+    color = msg.color;
+    document.getElementById('who').textContent = 'P' + (msg.slot + 2) + ' ' + msg.name;
+    document.getElementById('who').style.color = color;
+    document.getElementById('join').style.display = 'none';
+  } else if (msg.t === 'full') {
+    setMsg('GAME IS FULL (4 PLAYERS)');
+  } else if (msg.t === 'state') {
+    lastState = msg;
+    document.getElementById('score').textContent = msg.score;
+    const fill = document.getElementById('hullfill');
+    fill.style.width = Math.max(0, msg.hull * 100) + '%';
+    fill.style.background = msg.hull > 0.5 ? '#3f6' : msg.hull > 0.25 ? '#ffcc33' : '#f33';
+    document.getElementById('zap').classList.toggle('spent', !msg.zap);
+  } else if (msg.t === 'hit') {
+    if (navigator.vibrate) navigator.vibrate(60);
+  }
+}
+
+// aim = angle of the touch around the pad's centre, 0 = up, clockwise
+// (the same convention as the game's own aim)
+function aimFrom(x, y) {
+  aim = Math.atan2(x - W / 2, -(y - H * 0.55));
+  const now = performance.now();
+  if (now - lastAimSent > 30) {
+    lastAimSent = now;
+    send({ t: 'aim', a: aim });
+  }
+}
+
+function startFire() {
+  touching = true;
+  send({ t: 'aim', a: aim });
+  send({ t: 'fire' });
+  clearInterval(fireTimer);
+  fireTimer = setInterval(() => send({ t: 'fire' }), 150); // held = auto-fire
+}
+
+function stopFire() {
+  touching = false;
+  clearInterval(fireTimer);
+}
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const tch = e.touches[0];
+  aimFrom(tch.clientX, tch.clientY);
+  startFire();
+}, { passive: false });
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const tch = e.touches[0];
+  aimFrom(tch.clientX, tch.clientY);
+}, { passive: false });
+canvas.addEventListener('touchend', (e) => { if (!e.touches.length) stopFire(); });
+canvas.addEventListener('mousedown', (e) => { aimFrom(e.clientX, e.clientY); startFire(); });
+canvas.addEventListener('mousemove', (e) => { if (touching) aimFrom(e.clientX, e.clientY); });
+window.addEventListener('mouseup', stopFire);
+document.getElementById('zap').addEventListener('click', () => send({ t: 'zap' }));
+// heartbeat, so the host notices a pad that goes away
+setInterval(() => send({ t: 'ping' }), 1000);
+window.addEventListener('pagehide', () => send({ t: 'bye' }));
+document.getElementById('joinBtn').addEventListener('click', join);
+document.getElementById('name').addEventListener('keydown', (e) => { if (e.key === 'Enter') join(); });
+try { document.getElementById('name').value = localStorage.getItem('vortex-pilot') || ''; } catch (e) { /* ignore */ }
+if (!hostId) setMsg('OPEN THIS BY SCANNING THE QR CODE ON THE GAME SCREEN');
+
+// the pad: a ring of lanes, your reticle on it, and a hint
+function draw() {
+  ctx.fillStyle = 'rgba(5,0,15,0.35)';
+  ctx.fillRect(0, 0, W, H);
+  const cx = W / 2, cy = H * 0.55;
+  const R = Math.min(W, H) * 0.38;
+  ctx.strokeStyle = 'rgba(60,130,255,0.35)';
+  ctx.lineWidth = 1;
+  for (const f of [1, 0.66, 0.33]) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * f, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.sin(a) * R, cy - Math.cos(a) * R);
+    ctx.stroke();
+  }
+  const rx = cx + Math.sin(aim) * R, ry = cy - Math.cos(aim) * R;
+  ctx.strokeStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = touching ? 24 : 10;
+  ctx.lineWidth = touching ? 4 : 2.5;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(rx, ry);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(rx, ry, touching ? 18 : 13, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(63,255,102,0.6)';
+  ctx.font = "9px 'Press Start 2P', monospace";
+  ctx.textAlign = 'center';
+  const hint = lastState.st === 'playing' ? 'DRAG TO AIM - HOLD TO FIRE' : 'WAITING FOR THE HOST TO START...';
+  ctx.fillText(hint, cx, H - 70);
+  requestAnimationFrame(draw);
+}
+draw();
+</script>
+</body>
+</html>
