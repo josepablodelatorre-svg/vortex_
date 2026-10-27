@@ -7,27 +7,17 @@ let pointerX = CX, pointerY = CY - 1;
 function updateAimFromPointer(x, y) {
   const dx = x - CX;
   const dy = y - CY;
-  // 0 = up; in cockpit view the world is turned by viewRot, so add it back
-  aimAngle = normalizeAngle(Math.atan2(dx, -dy) + viewRot);
+  // 0 = up, clockwise
+  aimAngle = normalizeAngle(Math.atan2(dx, -dy));
 }
 
 // ---------- Cockpit view (SETTINGS: VIEW) ----------
 // Chase view shows the ship riding its arc. Cockpit view hides it and puts
-// you inside: the world turns so your lane stays under the nose
-// (viewRot = COCKPIT_TURN of the ship's offset from the bottom; below 1, so
-// aim and lane settle instead of chasing each other), and a canopy frame +
-// dashboard with live gauges is drawn over everything.
-const COCKPIT_TURN = 0.6;
+// you inside a steady forward view (the world doesn't turn with your lane;
+// a marker on the window's edge shows where the ship is), framed by the
+// bezel and dashboard drawCockpit() paints over everything.
 let viewMode = 'chase';
-let viewRot = 0;
 try { if (store.getItem('vortex-view') === 'cockpit') viewMode = 'cockpit'; } catch (e) { /* ignore */ }
-
-function updateView(dt) {
-  const target = viewMode === 'cockpit' && state === 'playing' ? COCKPIT_TURN * normalizeAngle(shipLane - Math.PI) : 0;
-  viewRot += (target - viewRot) * Math.min(1, dt * 8);
-  // the world keeps turning under a still pointer, so keep the aim in step
-  if (viewMode === 'cockpit' && state === 'playing') updateAimFromPointer(pointerX, pointerY);
-}
 
 // The cockpit (after the Game Boy era's flight sims, in VORTEX neon): a
 // heavy bezel round the view with dithered corners, a mission clock on top,
@@ -99,6 +89,27 @@ function drawCockpit() {
   ctx.beginPath();
   ctx.roundRect(L.vx0 - 6, L.vy0 - 6, L.vx1 - L.vx0 + 12, L.vy1 - L.vy0 + 12, r + 5);
   ctx.stroke();
+
+  // where the ship is: a chevron on the window's edge in its lane, so you
+  // can see which lane you're dodging into without the ship on screen
+  {
+    const dx = Math.sin(shipLane), dy = -Math.cos(shipLane);
+    const hw = (L.vx1 - L.vx0) / 2 - 16, hh = (L.vy1 - L.vy0) / 2 - 16;
+    const cxv = (L.vx0 + L.vx1) / 2, cyv = (L.vy0 + L.vy1) / 2;
+    const k = Math.min(Math.abs(hw / (dx || 1e-6)), Math.abs(hh / (dy || 1e-6)));
+    const mx = cxv + dx * k, my = cyv + dy * k;
+    ctx.save();
+    ctx.translate(mx, my);
+    ctx.rotate(shipLane + Math.PI); // tip points outward, at the rim
+    ctx.fillStyle = accent;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 14;
+    ctx.beginPath();
+    ctx.moveTo(0, 12); ctx.lineTo(-14, -4); ctx.lineTo(-5, -4); ctx.lineTo(0, 3); ctx.lineTo(5, -4); ctx.lineTo(14, -4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
 
   // mission clock plate, notched into the top edge
   const secs = missionType === 'survive' && gameMode === 'campaign' ? Math.max(0, SURVIVE_TIME - missionTime) : runT;

@@ -46,7 +46,6 @@ function simulate(dt) {
   updateCycles(dt);
   updateTrack(dt);
   updateEnv(dt);
-  updateView(dt);
   updateTutorial(dt);
 }
 requestAnimationFrame(loop);

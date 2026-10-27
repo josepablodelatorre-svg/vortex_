@@ -423,9 +423,11 @@ run tier, score and the mission progress. CONTINUE on SIGNAL LOST
 `continueFromCheckpoint()`. Beating the campaign clears it.
 
 **Cockpit view** — SETTINGS → VIEW: CHASE / COCKPIT (`viewMode`, saved as
-`vortex-view`). In cockpit the ship isn't drawn; the world is rotated by
-`viewRot` (`COCKPIT_TURN` × the ship lane's offset from the bottom, < 1 so
-aim and lane settle) and `drawCockpit()` frames it like an early-90s
+`vortex-view`). In cockpit the ship isn't drawn and the view stays steady
+(the world doesn't turn with your lane, only banks with the camera path);
+a glowing chevron on the window's edge marks the ship's lane, and
+`shipCallout()` pops text low in the window instead of at the ship.
+`drawCockpit()` frames it like an early-90s
 handheld flight sim in VORTEX neon (`cockpitLayout()` sizes it): a heavy
 bezel with dithered corners round a rounded window, a mission clock plate
 (counting down on survive missions), score and level on the bezel, a speed
@@ -435,8 +437,7 @@ cells, the radar scope (`drawRadar(cx, cy, r, true)`) over the flight mode,
 a 4×4 sector map filling with the objective (boss cell last), and weapon
 slots (triple, echo, disc, bombs). It all jolts on hits. The HTML HUD hides
 in cockpit and the comms box and BOMB / LOCK / pause buttons move inside
-the glass (`--cp-*` CSS variables set in `syncRunClass()`). `updateAimFromPointer()` adds `viewRot` back so aiming
-stays where you point.
+the glass (`--cp-*` CSS variables set in `syncRunClass()`).
 
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down

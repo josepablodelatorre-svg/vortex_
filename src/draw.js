@@ -37,7 +37,7 @@ function draw() {
     // rolling through a turn, then restore so HUD/reticle math stays simple
     ctx.save();
     ctx.translate(CX, CY);
-    ctx.rotate(camRoll - viewRot);
+    ctx.rotate(camRoll);
     ctx.translate(-CX, -CY);
     // impact shake: a small random jitter that decays with shakeTimer, so
     // hits/boss-kills read as physical punches rather than silent hp loss

@@ -190,7 +190,8 @@ function drawPortrait() {
 
 // a big callout floating up from the ship itself
 function shipCallout(text, color) {
-  const pos = shipScreenPos(shipLane);
+  // in cockpit the ship isn't on screen: call out low in the window instead
+  const pos = viewMode === 'cockpit' ? { x: CX, y: cockpitLayout().vy1 - 70 } : shipScreenPos(shipLane);
   hitLabels.push({ x: pos.x + (CX - pos.x) * 0.25, y: pos.y + (CY - pos.y) * 0.25, vy: -46, life: 1.0, maxLife: 1.0, text, color, size: 15 });
 }
 

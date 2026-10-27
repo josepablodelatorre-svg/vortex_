@@ -257,6 +257,10 @@ function backToMenu() {
   versus = false;
   state = 'title';
   for (const id of ['gameover', 'cleared']) document.getElementById(id).style.display = 'none';
+  // leaving mid-run: clear the run's banner and briefing off the menu
+  document.getElementById('levelbanner').style.opacity = '0';
+  document.getElementById('briefing').style.opacity = '0';
+  briefingTimer = 0;
   document.getElementById('title').style.display = '';
   showScreen('menu');
   setMusicTrack('garden');

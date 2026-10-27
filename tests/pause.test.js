@@ -23,6 +23,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await p.click('#pauseBtn'); await p.waitForTimeout(100);
   await p.click('#pauseMenuBtn'); await p.waitForTimeout(300);
   ok(await ev('state') === 'title' && !(await ev('paused')) && !(await p.isVisible('#pauseBtn')), 'MENU leaves the run');
+  ok(await ev(`document.getElementById('levelbanner').style.opacity === '0' && document.getElementById('briefing').style.opacity === '0'`), 'no banner or briefing left over on the menu');
   await ev('versus = true; state = "playing"'); await ev('pauseGame()');
   ok(!(await ev('paused')), 'no pause in versus');
   await ev('versus = false; state = "title"');
