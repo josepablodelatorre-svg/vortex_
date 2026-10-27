@@ -40,7 +40,8 @@ function update(dt) {
   const prevX = shipX;
   // a turn-rate limited slide (dodging takes a moment), eased at the end
   const laneSpeed = LANE_SPEED * (lockinTimer > 0 ? 2 : 1);
-  const step = Math.sign(laneDiff) * Math.min(Math.abs(laneDiff), laneSpeed * dt, Math.abs(laneDiff) * 12 * dt + 0.002);
+  teleportHold = Math.max(0, teleportHold - dt);
+  const step = teleportHold > 0 ? 0 : Math.sign(laneDiff) * Math.min(Math.abs(laneDiff), laneSpeed * dt, Math.abs(laneDiff) * 12 * dt + 0.002);
   shipLane = normalizeAngle(shipLane + step);
   shipLaneVel = step / Math.max(dt, 1e-4);
   shipX = shipScreenPos(shipLane).x - CX;

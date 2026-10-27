@@ -33,6 +33,7 @@ let trackItems = [];   // { kind, angle, z }
 let trackTimer = 6;
 let boostTimer = 0, brakeTimer = 0, tripTimer = 0;
 let teleportFlash = 0;
+let teleportHold = 0; // seconds the ship stays in its new lane after a portal
 // warp ink: hitting warp speed drains the colour and inverts the screen, so
 // the speed lines turn into black ink strokes on white, for INK_TIME
 const INK_TIME = 7;
@@ -82,6 +83,9 @@ function triggerTrackItem(it) {
     // the mirror lane: across the screen (or straight across the ring in lock-in)
     shipLane = normalizeAngle(lockinTimer > 0 ? shipLane + Math.PI : -shipLane);
     shipX = shipScreenPos(shipLane).x - CX;
+    // the pointer is still over the old side: hold the new lane for a moment
+    // instead of sliding straight back to it
+    teleportHold = 1.0;
     teleportFlash = 1;
     const pos = shipScreenPos(shipLane);
     shatter(pos.x, pos.y, '200,120,255', 40, 1.4);
