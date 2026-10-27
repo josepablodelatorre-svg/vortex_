@@ -17,6 +17,23 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   await p.waitForTimeout(800);
   ok(await ev('runCoins') === 5, 'coins outside your lane are missed');
   ok(await ev(`store.getItem('vortex-coins')`) === '25', 'coins are saved');
+  // steering toward where a row is drawn (swirl and all) collects it
+  const steer = await ev(`(() => {
+    let got = 0;
+    for (const off of [-1.1, -0.6, 0.6, 1.1]) {
+      trackItems = []; enemies = []; spawnTimer = 99; trackTimer = 99; runT = 80;
+      const before = runCoins, A = normalizeAngle(Math.PI + off);
+      for (let k = 0; k < 5; k++) trackItems.push({ kind: 'coin', angle: A, z: 0.9 + k * 0.05 });
+      for (let i = 0; i < 480; i++) {
+        const c = trackItems.find(it => it.kind === 'coin' && !it.done);
+        if (c) { const v = pointOnRing(c.angle, c.z); aimAngle = normalizeAngle(Math.atan2(v.x - CX, -(v.y - CY)) + camRoll); }
+        hull = hullMax; simulate(1 / 60);
+      }
+      got += runCoins - before;
+    }
+    return got;
+  })()`);
+  ok(steer === 20, 'steering at where coins are drawn collects every coin (' + steer + '/20)');
   // shop
   await ev('coins = 500; saveWallet(); damageShip(99999)'); await p.waitForTimeout(300);
   ok((await ev(`document.getElementById('rankLost').textContent`)).includes('COINS'), 'results show coins earned');

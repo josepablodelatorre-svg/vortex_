@@ -27,6 +27,8 @@ let plasma = 0, plasmaMax = 0, plasmaHitAt = -99;
 //   portal (purple swirl)      teleports the ship to the mirror lane
 const PAD_TIME = 3;
 const TRACK_HIT = 0.34;
+const COIN_HIT = 0.5;    // coins: a wider lane than pads...
+const COIN_REACH = 0.14; // ...and grabbed anywhere in the last stretch
 let trackItems = [];   // { kind, angle, z }
 let trackTimer = 6;
 let boostTimer = 0, brakeTimer = 0, tripTimer = 0;
@@ -139,9 +141,12 @@ function updateTrack(dt) {
       continue;
     }
     if (it.kind === 'coin') {
-      if (!it.done && it.z <= 0.04) {
+      // coins are grabbed anywhere over the last stretch of their approach
+      // (not one exact moment) and in a generous lane, so steering toward
+      // where a row looks to be is enough
+      if (!it.done && it.z <= COIN_REACH && inShipLane(it.angle, COIN_HIT + 0.08 * up('magnet'))) {
         it.done = true;
-        if (inShipLane(it.angle, TRACK_HIT + 0.08 * up('magnet'))) {
+        {
           addCoins(1);
           missionEvent('coin');
           it.got = true;
@@ -150,6 +155,7 @@ function updateTrack(dt) {
           burst(it.angle, 0.04, { color: '255,210,63', bitColor: '#ffd23f', label: '+1', labelColor: '#ffe680' });
         }
       }
+      if (!it.done && it.z <= 0) it.done = true; // missed
       continue;
     }
     if (it.z <= 0.03 && !it.done) {
@@ -179,7 +185,7 @@ function drawTrackItems() {
       const x = pt.x + (CX - pt.x) * 0.05, y = pt.y + (CY - pt.y) * 0.05;
       // lined up with the ship's lane: brighter, bigger, pulsing, so you
       // can see you're on course to collect it
-      const onCourse = inShipLane(it.angle, TRACK_HIT + 0.08 * up('magnet'));
+      const onCourse = inShipLane(it.angle, COIN_HIT + 0.08 * up('magnet'));
       const r = (3 + 12 * near) * (onCourse ? 1.25 + Math.sin(t * 12) * 0.08 : 1);
       ctx.beginPath();
       ctx.ellipse(x, y, r * Math.abs(Math.cos(t * 4 + it.z * 20)) + 1, r, 0, 0, Math.PI * 2);
