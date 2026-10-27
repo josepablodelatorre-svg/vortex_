@@ -249,6 +249,33 @@ head, slit eye), it sways around the tube and stomps forward
 Recognizers, the final boss, the Rift, very low hull and (half the time)
 on arriving in a new level, where it replaces the commander's line.
 
+**Ranks** — `runRank(won)` grades each run S–D from progress (55),
+accuracy `runHits/runShots` of real bolts (25) and damage taken (20);
+`showRank()` puts the letter on SIGNAL LOST / SIGNAL SECURED.
+
+**Achievements** — `ACHIEVEMENTS` (8), saved in `vortex-achievements`;
+`unlockAchievement(id)` shows a `#toast`. Four unlock extra
+`SHIP_PALETTES` (4–7: Ice, Toxic, Sunset, Sark); `paletteLock(i)` keeps
+them dashed and unselectable until earned. Counter under the ship picker.
+
+**Save clip** — all audio now goes through `audioOut()` (one master gain
+feeding the speakers and `clipAudioDest`). `updateClipRecording()` keeps
+two overlapping `MediaRecorder`s on `canvas.captureStream()` + that audio,
+restarted every `CLIP_SEGMENT` s while a run or its results are up;
+SAVE CLIP stops the older one and downloads `vortex-clip.webm` (the
+last 8–16s). Canvas only: the HTML HUD/CRT overlay aren't in the clip.
+
+**Daily tunnel** — `#dailyBtn` starts a campaign with `daily = true`:
+`rng(stream)` is then a date-seeded mulberry32 with one independent
+stream per spawner (`enemy`, `powerup`, `fire`, `core`), used by every
+gameplay spawn and timer; effects still use `Math.random`. Best per day
+in `vortex-daily-YYYY-MM-DD`. SHARE uses `navigator.share` or copies a
+line with a `?daily` link, which highlights the daily button.
+
+**Run clock** — `runT` (reset in `startGame`) drives difficulty, spawn
+decay, tunnel pull and swirl. These used to read `t` (time since the page
+loaded), so a second run in the same session started harder.
+
 **Hull / damage** — `damageShip(amount)` is the one shared path for
 enemy contact (16), enemy bolts (10), boss contact (22) — tuned down
 once already from original harsher values so runs last longer. Power-ups
