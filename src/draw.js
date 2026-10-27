@@ -48,7 +48,9 @@ function draw() {
     // open environments draw their own world where the tube fades out
     drawSpace(env === 'space' ? 1 - envK.tunnel : 0);
     drawSurface(env === 'surface' ? 1 - envK.tunnel : 0);
+    drawRockField(env === 'asteroid' ? 1 : 0);
     drawTunnel();
+    drawTrenchDetails(env === 'trench' ? 1 : 0);
     drawTrackItems();
     drawTurrets();
     drawWarp();

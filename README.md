@@ -26,6 +26,7 @@ src/             — the game, as plain scripts loaded in this order:
   world.js         difficulty, tunnel + camera path, entity lists, projection
   environments.js  tube / trench / asteroids / space / planet surface
   turrets.js       gun turrets on the trench walls and the planet's ground
+  vistas.js        several looks per environment (space, planet, trench, rocks)
   input.js         mouse, touch, keyboard, cockpit view
   meta.js          CRT, achievements, palettes, ship classes, clips, daily
                    tunnel, ranks, best scores, screen shake
@@ -483,6 +484,20 @@ window `blur` (phone lock, tab switch). While paused the loop skips every
 update, the music elements pause and the AudioContext is suspended.
 Not available in versus. MENU on the overlay leaves the run (the
 checkpoint is kept).
+
+**Vistas** — `src/vistas.js` gives each environment several looks, picked
+fresh each level (`rollVista(true)` in `onLevelStart`) and crossfaded to
+another at the halfway checkpoint and at each Rift sector (`vista`,
+`vistaPrev`, `vistaFade`, `withVistas()`). Open space: black hole + spiral
+galaxy, neon nebula, ringed gas giant with moons, twin suns with a dust
+lane, or a distant fleet (`SPACE_VISTAS`, `drawSpaceFeature()`; the star
+stream stays in `drawSpace`). Planet: sunset mountains, moonlit valley,
+toxic canyon under twin moons, crimson dunes under a ringed planet, icy
+peaks under an aurora (`SURFACE_VISTAS`: colour, `terrainHeight()` style
+and `drawSky()`). Trench: classic blue, amber, red alert (strobing lights)
+or green circuit, with wall panels, pipes and running lights
+(`drawTrenchDetails()`). The asteroid field gets big boulders drifting in
+the distance (`drawRockField()`).
 
 **Turrets** — `src/turrets.js`: in the trench, emplacements bolted to
 the walls and floor; on the planet, domes on the ground. They scroll in

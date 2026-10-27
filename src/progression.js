@@ -898,6 +898,7 @@ function pickRiftShape() {
 }
 
 function enterRiftSector() {
+  rollVista(riftDepth === 1); // each sector looks a bit different
   killCount = 0;
   nextMinibossIndex = MINIBOSS_THRESHOLDS.length; // no minibosses in the Rift
   currentLevel = Math.min(LEVEL_COUNT, riftDepth); // enables clusters etc. like the later levels

@@ -47,6 +47,7 @@ function simulate(dt) {
   updateCycles(dt);
   updateTrack(dt);
   updateTurrets(dt);
+  updateVistas(dt);
   updateEnv(dt);
   updateTutorial(dt);
 }

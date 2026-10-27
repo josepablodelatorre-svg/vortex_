@@ -63,6 +63,7 @@ function updateEnv(dt) {
   if (gameMode === 'campaign' && !midSaved && missionProgress() >= 0.5) {
     midSaved = true;
     saveCheckpoint(true);
+    rollVista(false); // and a new view for the second half
   }
   // the trench ends at its vent, just before the boss
   const nearEnd = gameMode === 'rift'
@@ -97,19 +98,10 @@ function drawSpace(alpha) {
   if (alpha <= 0.01) return;
   const far = pointOnRing(0, 1);
   const maxR = Math.hypot(W, H) * 0.6;
+  // the vista: black hole, nebula, gas giant, twin suns or a fleet
+  withVistas('space', alpha, drawSpaceFeature);
   ctx.save();
   ctx.globalAlpha = alpha;
-  // a faint spiral galaxy off to one side
-  ctx.save();
-  ctx.translate(W * 0.2, H * 0.24);
-  ctx.rotate(t * 0.03);
-  for (let i = 0; i < 260; i++) {
-    const arm = i % 2, k = i / 260;
-    const a = arm * Math.PI + k * 9, r = k * Math.min(W, H) * 0.16;
-    ctx.fillStyle = `rgba(${180 + arm * 60},${150 + k * 80},255,${0.5 * (1 - k)})`;
-    ctx.fillRect(Math.cos(a) * r, Math.sin(a) * r * 0.45, 2, 2);
-  }
-  ctx.restore();
   // stars streaming outward from the vanishing point
   ctx.lineCap = 'round';
   const speed = 0.25 * padSpeed() * warpBoost();
@@ -124,30 +116,6 @@ function drawSpace(alpha) {
     ctx.lineTo(far.x + Math.cos(st.a) * r0, far.y + Math.sin(st.a) * r0);
     ctx.stroke();
   }
-  // the black hole at the vanishing point: accretion disc, photon ring, void
-  const R = Math.min(W, H) * 0.05;
-  ctx.save();
-  ctx.translate(far.x, far.y);
-  ctx.globalCompositeOperation = 'lighter';
-  for (let k = 0; k < 4; k++) {
-    ctx.beginPath();
-    ctx.ellipse(0, 0, R * (3.2 - k * 0.45), R * (0.62 - k * 0.08), -0.25, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255,${140 + k * 25},60,${0.35 + k * 0.12})`;
-    ctx.lineWidth = 2 + k;
-    ctx.shadowColor = '#ff9a3c';
-    ctx.shadowBlur = 18;
-    ctx.stroke();
-  }
-  ctx.beginPath();
-  ctx.arc(0, 0, R * 1.12, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(255,240,210,0.9)';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.restore();
-  ctx.fillStyle = '#000';
-  ctx.beginPath();
-  ctx.arc(far.x, far.y, R, 0, Math.PI * 2);
-  ctx.fill();
   ctx.restore();
 }
 
@@ -155,9 +123,13 @@ function drawSpace(alpha) {
 const SKY_STARS = Array.from({ length: 90 }, () => ({ x: Math.random(), y: Math.random() * 0.5, b: Math.random() }));
 function drawSurface(alpha) {
   if (alpha <= 0.01) return;
-  // even Rift depths and later campaign runs get the cold moonlit version
-  const moon = gameMode === 'rift' ? riftDepth % 2 === 0 : runTier % 2 === 1;
-  const lineRGB = moon ? '225,235,255' : '255,120,60';
+  withVistas('surface', alpha, (i, a) => drawSurfaceLook(SURFACE_VISTAS[i], a));
+}
+
+// one planet look: its sky and its terrain, in its own colour
+function drawSurfaceLook(look, alpha) {
+  if (alpha <= 0.01) return;
+  const lineRGB = look.line;
   const horizon = CY;
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -165,20 +137,9 @@ function drawSurface(alpha) {
     ctx.fillStyle = `rgba(255,255,230,${0.3 + 0.6 * st.b * (0.6 + 0.4 * Math.sin(t * 2 + st.x * 40))})`;
     ctx.fillRect(st.x * W, st.y * H, 2, 2);
   }
-  const sr = Math.min(W, H) * 0.12;
-  const sx = CX + W * 0.22, sy = horizon - H * 0.2;
-  const grad = ctx.createRadialGradient(sx, sy, sr * 0.2, sx, sy, sr);
-  grad.addColorStop(0, moon ? '#ffffff' : '#ffd36b');
-  grad.addColorStop(1, moon ? 'rgba(170,190,220,0.85)' : 'rgba(255,140,30,0.9)');
-  ctx.fillStyle = grad;
-  ctx.shadowColor = moon ? '#cfe2ff' : '#ff9a2c';
-  ctx.shadowBlur = 50;
-  ctx.beginPath();
-  ctx.arc(sx, sy, sr, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  // the terrain: rows rolling toward the player, mountains rising toward the
-  // sides so the middle stays a flyable valley
+  drawSky(look, horizon);
+  // the terrain: rows rolling toward the player, rising toward the sides
+  // so the middle stays a flyable valley (shape depends on the look)
   const ROWS = 22, COLS = 34;
   const scroll = tunnelTravel * 4;
   const frac = scroll % 1, base = Math.floor(scroll);
@@ -189,8 +150,7 @@ function drawSurface(alpha) {
     const row = [];
     for (let c = 0; c <= COLS; c++) {
       const u = (c / COLS) * 3.4 - 1.7;
-      const mount = Math.min(1, Math.max(0, (Math.abs(u) - 0.3) / 1.0));
-      const h = noise2(u * 2.2, (k + base) * 0.35) * mount * mount;
+      const h = terrainHeight(look.terrain, u, k + base);
       row.push([CX + u * W * (0.05 + near * 0.95), horizon + (H - horizon) * near - h * H * 0.42 * (0.25 + near * 0.75)]);
     }
     pts.push({ row, zz });

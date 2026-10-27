@@ -202,6 +202,7 @@ function onLevelStart() {
   if (currentLevel > 1) saveCheckpoint(false);
   midSaved = false;
   ventSpawned = false;
+  rollVista(true);
   if (gameMode === 'campaign') missionEvent('level', currentLevel);
   setEnv(routeEnv(), true);
   // the level banner names where this level starts
