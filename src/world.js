@@ -4,10 +4,12 @@
 // Difficulty presets, chosen on the title screen before a run starts.
 let difficultySetting = 'normal';
 const DIFFICULTY_PARAMS = {
-  easy:   { spawnBase: 2.6, spawnMin: 1.2, spawnDecay: 0.004, speedBase: 0.055, speedVar: 0.02,  rampRate: 0.008 },
-  normal: { spawnBase: 2.0, spawnMin: 0.8, spawnDecay: 0.006, speedBase: 0.07,  speedVar: 0.03,  rampRate: 0.012 },
-  hard:   { spawnBase: 1.3, spawnMin: 0.45,spawnDecay: 0.01,  speedBase: 0.09,  speedVar: 0.045, rampRate: 0.02 },
+  easy:   { spawnBase: 2.0, spawnMin: 1.0, spawnDecay: 0.004, speedBase: 0.06,  speedVar: 0.02,  rampRate: 0.008, damage: 0.75, fire: 1.25 },
+  normal: { spawnBase: 1.4, spawnMin: 0.65,spawnDecay: 0.006, speedBase: 0.075, speedVar: 0.03,  rampRate: 0.012, damage: 1,    fire: 1 },
+  hard:   { spawnBase: 1.0, spawnMin: 0.4, spawnDecay: 0.01,  speedBase: 0.095, speedVar: 0.045, rampRate: 0.02,  damage: 1.4,  fire: 0.7 },
 };
+// damage: multiplies every hit on the ship; fire: multiplies the time
+// between enemy and boss shots (lower = more fire)
 
 // Scales the chosen difficulty preset up by the current run tier, so each
 // New-Game-Plus continuation after a win spawns faster/denser/quicker than
@@ -24,7 +26,9 @@ function getDiffParams() {
     spawnDecay: base.spawnDecay,
     speedBase: base.speedBase * speedMul,
     speedVar: base.speedVar * speedMul,
-    rampRate: base.rampRate * rampMul
+    rampRate: base.rampRate * rampMul,
+    damage: base.damage,
+    fire: base.fire
   };
 }
 

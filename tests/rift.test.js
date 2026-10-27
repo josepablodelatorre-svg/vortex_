@@ -43,7 +43,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   // boss gate at depth 3
   await ev('hull = HULL_MAX; killCount = 12'); await p.waitForTimeout(150);
   ok(await ev('bossActive && boss.kind === "level" && riftDepth === 3'), 'depth 3 ends in a boss, hp ' + await ev('boss && boss.hpMax'));
-  for (let i = 0; i < 40 && await ev('!!boss'); i++) {
+  for (let i = 0; i < 300 && await ev('!!boss'); i++) {
     await ev('hull = HULL_MAX; if (boss) { boss.z = 0.5; bolts.push({angle: boss.angle, z: 0.5}); }');
     await p.waitForTimeout(60);
   }

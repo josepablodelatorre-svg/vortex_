@@ -606,6 +606,32 @@ Shipped since the last export: ship/accent color customization, local
 high score + furthest-run tracking, and screen shake — all three were on
 this list before and are now built (see Architecture above).
 
+## Balance simulator
+
+`node tools/balance.js [difficulty] [skill] [runs]` has a bot pilot play
+whole campaigns through `simulate(dt)` (the loop minus drawing), far
+faster than real time, and prints per level: how many runs reached it,
+deaths, time, boss-fight time and damage taken. The bot points at where
+things are drawn (like a person), with a reaction time, aim error, limited
+hand speed, distraction, click rate and dodge chance per skill (`novice`,
+`average`, `good`; plus `perfect` and `idle` for diagnostics).
+
+What the first pass found and changed:
+- Aim didn't match the picture: far enemies are drawn swirled, bent and
+  banked, but shots used the raw pointer angle, so pointing at a distant
+  enemy missed (by over 0.6 rad on level 1). Now `findAimTarget()` locks
+  whatever the pointer is on *as drawn* (`seenAngle()`, `AIM_GRAB`) and
+  `fire()` sends the bolt down that target's lane.
+- Bosses couldn't hurt the ship: they sat at the top of the ring while the
+  ship rides the bottom half. Warships now drift toward the ship's lane
+  (faster each level), the Watchdog sways across the bottom, and volleys
+  are spread wider (±0.38) than one shot can cancel (`da < 0.25`).
+- Boss fights lasted 1–5 s: `BOSS_HP_BASE` 30, `+8` per level, minibosses
+  12. Lock-in comes about once a level (`POWER_PER_KILL` 5).
+- Difficulties barely differed: denser spawns all round, and each preset
+  now scales damage taken and enemy fire rate (`damage`, `fire` in
+  `DIFFICULTY_PARAMS`: easy 0.75/1.25, normal 1/1, hard 1.4/0.7).
+
 ## Tests
 
 Headless browser tests live in `tests/` (Playwright). `cd tests && npm

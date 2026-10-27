@@ -28,7 +28,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   // warp after the level boss
   await ev('briefingTimer = 0; enemies = []; killCount = 20; nextMinibossIndex = 2'); await p.waitForTimeout(250);
   ok(await ev('bossActive && boss.kind === "level"'), 'level boss arms');
-  for (let i = 0; i < 60 && await ev('!!boss'); i++) { await ev('hull = hullMax; if (boss) { boss.z = 0.5; bolts.push({angle: boss.angle, z: 0.5}); }'); await p.waitForTimeout(50); }
+  for (let i = 0; i < 300 && await ev('!!boss'); i++) { await ev('hull = hullMax; if (boss) { boss.z = 0.5; bolts.push({angle: boss.angle, z: 0.5}); }'); await p.waitForTimeout(50); }
   ok(await ev('warpTimer > 0 && currentLevel === 2'), 'beating boss starts the warp into level 2');
   await p.waitForFunction('spikes.length > 0', null, { timeout: 8000 }).catch(() => {});
   ok(await ev('spikes.length > 0 && enemies.length === 0'), 'spikes during warp, no enemies (' + await ev('spikes.length') + ' spikes)');

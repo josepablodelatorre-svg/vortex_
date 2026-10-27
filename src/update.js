@@ -117,7 +117,7 @@ function update(dt) {
         e.fireTimer -= dt;
         if (e.fireTimer <= 0 && e.z > 0.12 && e.z < 0.92) {
           enemyBolts.push({ angle: e.angle, z: e.z });
-          e.fireTimer = 1.9 + rng('fire') * 1.3;
+          e.fireTimer = (1.9 + rng('fire') * 1.3) * diffParams.fire;
           playEnemyShot();
         }
       }
@@ -165,8 +165,16 @@ function update(dt) {
     // of ending the fight outright
     if (boss && boss.alive) {
       boss.z -= 0.025 * dt;
+      if (boss.form !== 'watchdog') {
+        // warships hunt the ship: they drift round the ring toward its lane,
+        // a little faster each level, so their volleys have to be dodged
+        const chase = (boss.kind === 'mini' ? 0.5 : 0.35 + 0.05 * currentLevel) * dt;
+        const gap = normalizeAngle(shipLane - boss.angle);
+        boss.angle = normalizeAngle(boss.angle + Math.sign(gap) * Math.min(Math.abs(gap), chase));
+      }
       if (boss.form === 'watchdog') {
-        boss.angle = normalizeAngle(Math.sin(t * 0.5 + boss.seed) * 1.3);
+        // sways across the bottom of the tunnel, where the ship flies
+        boss.angle = normalizeAngle(Math.PI + Math.sin(t * 0.5 + boss.seed) * 1.3);
         boss.stompTimer -= dt;
         if (boss.stompTimer <= 0) {
           boss.lunge = 0.45;
@@ -181,10 +189,10 @@ function update(dt) {
       }
       boss.fireTimer -= dt;
       if (boss.fireTimer <= 0 && boss.z < 0.9) {
-        for (const off of [-0.22, 0, 0.22]) {
+        for (const off of [-0.38, 0, 0.38]) { // wider than a shot can cancel: move or eat it
           enemyBolts.push({ angle: boss.angle + off, z: boss.z });
         }
-        boss.fireTimer = 1.6 + Math.random() * 0.8;
+        boss.fireTimer = (1.6 + Math.random() * 0.8) * getDiffParams().fire;
         playEnemyShot();
       }
       if (boss.z <= 0.12) {
@@ -383,7 +391,7 @@ function update(dt) {
       for (const eb of enemyBolts) {
         if (eb.z < -0.4) continue;
         let da = Math.abs(normalizeAngle(b.angle - eb.angle));
-        if (da < 0.35 && Math.abs(b.z - eb.z) < 0.12) {
+        if (da < 0.25 && Math.abs(b.z - eb.z) < 0.12) {
           b.z = 2;
           eb.z = -1;
         }

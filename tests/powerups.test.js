@@ -35,8 +35,10 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   const x2 = await ev('shipScreenPos(shipLane).x');
   ok(x1 > 600 && x2 < 400, 'ship slides right/left with aim: ' + x1.toFixed(0) + ' / ' + x2.toFixed(0));
   // lock-on finds an enemy in line
-  await ev(`aimAngle = 0.5; enemies = []; spawnEnemy(0.55, 'drone'); enemies[0].z = 0.5;`);
-  ok(await ev('findAimTarget() === enemies[0]'), 'bullseye locks onto enemy in line');
+  await ev(`enemies = []; spawnEnemy(0.55, 'drone'); enemies[0].z = 0.5; aimAngle = seenAngle(enemies[0]) + 0.05;`);
+  ok(await ev('findAimTarget() === enemies[0]'), 'bullseye locks onto the enemy where it is drawn');
+  await ev('bolts = []; fire()');
+  ok(await ev('bolts[0].angle === enemies[0].angle'), 'and the shot goes down that enemy\'s lane');
   await ev('aimAngle = -2');
   ok(await ev('findAimTarget() === null'), 'no lock when nothing in line');
   // spawn distribution

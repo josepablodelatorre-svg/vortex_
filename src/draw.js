@@ -1193,19 +1193,28 @@ function drawNova() {
   ctx.restore();
 }
 
-// Bullseye: whatever the shot will hit next (nearest enemy, or the boss, in
-// line with the aim) gets a rotating lock-on reticle. With nothing in line,
-// a faint bullseye sits out along the firing line so the aim always reads.
+// Where something appears to the pointer: its screen angle around the
+// centre, with the swirl, bend and stretch it's drawn with, plus the
+// camera's banking (aimAngle is measured in the same frame). Far things
+// can sit a long way round from their lane angle, so aiming works on this.
+function seenAngle(o) {
+  const v = pointOnRing(o.angle, o.z);
+  return normalizeAngle(Math.atan2(v.x - CX, -(v.y - CY)) + camRoll);
+}
+
+// Bullseye: whatever the pointer is on (nearest enemy, core or the boss
+// where it's drawn) gets a rotating lock-on reticle, and that's where the
+// shot goes (fire() sends the bolt down that target's lane). With nothing
+// under the pointer, a faint bullseye sits out along the firing line.
+const AIM_GRAB = 0.34; // radians either side of the pointer
 function findAimTarget() {
   let best = null;
-  for (const e of enemies) {
-    if (!e.alive || e.z > 0.95) continue;
-    if (Math.abs(normalizeAngle(aimAngle - e.angle)) < 0.4 && (!best || e.z < best.z)) best = e;
-  }
-  if (boss && boss.alive && Math.abs(normalizeAngle(aimAngle - boss.angle)) < 0.4 && (!best || boss.z < best.z)) best = boss;
-  for (const c of cores) {
-    if (c.alive && Math.abs(normalizeAngle(aimAngle - c.angle)) < 0.4 && (!best || c.z < best.z)) best = c;
-  }
+  const consider = (o) => {
+    if (Math.abs(normalizeAngle(aimAngle - seenAngle(o))) < AIM_GRAB && (!best || o.z < best.z)) best = o;
+  };
+  for (const e of enemies) if (e.alive && e.z <= 0.95) consider(e);
+  if (boss && boss.alive) consider(boss);
+  for (const c of cores) if (c.alive) consider(c);
   return best;
 }
 
@@ -1291,13 +1300,16 @@ function drawAimLine() {
 
   if (state !== 'playing') return;
   // dotted firing line: the path a bolt will actually take down the tunnel
+  // (curving with the swirl to the locked target, if there is one)
+  const target = findAimTarget();
+  const lineAngle = target ? target.angle : aimAngle;
+  const lineEnd = target ? Math.min(0.6, target.z) : 0.6;
   ctx.fillStyle = 'rgba(255,225,77,0.85)';
-  for (let z = 0.06; z < 0.6; z += 0.04) {
-    const pt = pointOnRing(aimAngle, z);
+  for (let z = 0.06; z < lineEnd; z += 0.04) {
+    const pt = pointOnRing(lineAngle, z);
     const d = 5 - z * 4; // dots shrink with distance
     ctx.fillRect(pt.x - d / 2, pt.y - d / 2, d, d);
   }
-  const target = findAimTarget();
   if (target && target === boss) {
     // bosses get corner brackets framing the whole ship, not a bullseye over it
     const pt = pointOnRing(boss.angle, boss.z);

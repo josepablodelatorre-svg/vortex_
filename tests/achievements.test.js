@@ -16,7 +16,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   // untouchable: beat a boss without damage
   await ((await p.evaluate("state === 'title'")) ? p.evaluate('startGame(false)') : p.mouse.click(500, 740)); await wait(200);
   await ev('briefingTimer = 0; enemies = []; killCount = 20; nextMinibossIndex = 2'); await wait(300);
-  for (let i = 0; i < 60 && await ev('!!boss'); i++) { await ev('if (boss) { boss.z = 0.5; boss.fireTimer = 9; bolts.push({angle: boss.angle, z: 0.5}); } enemyBolts = []'); await wait(50); }
+  for (let i = 0; i < 300 && await ev('!!boss'); i++) { await ev('if (boss) { boss.z = 0.5; boss.fireTimer = 9; bolts.push({angle: boss.angle, z: 0.5}); } enemyBolts = []'); await wait(50); }
   ok(await ev('achieved.untouchable === true'), 'beating a boss untouched unlocks UNTOUCHABLE');
   ok((await ev(`document.getElementById('toast').textContent + toastQueue.join(' ')`)).includes('ICE'), 'toast announces the new colour');
   // rank on death

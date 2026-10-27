@@ -120,9 +120,12 @@ canvas.addEventListener('touchmove', (e) => {
 function fire() {
   if (state !== 'playing') return;
   if (discCharges > 0 && !disc) { throwDisc(); return; }
+  // the shot goes down the lane of whatever the pointer is on, as drawn
+  const target = findAimTarget();
+  const aim = target ? target.angle : aimAngle;
   const angles = tripleLaserTimer > 0
-    ? [-0.16, 0, 0.16].map(off => normalizeAngle(aimAngle + off))
-    : [aimAngle];
+    ? [-0.16, 0, 0.16].map(off => normalizeAngle(aim + off))
+    : [aim];
   for (const angle of angles) bolts.push({ angle, z: 0.04 });
   runShots += angles.length;
   levelShots += angles.length;
@@ -131,7 +134,7 @@ function fire() {
       for (const angle of angles) echoQueue.push({ at: t + delay, angle });
     }
   }
-  pulses.push({ startTime: t, angle: aimAngle });
+  pulses.push({ startTime: t, angle: aim });
   shipRecoil = 1;
   lastShotTime = t;
   playZap();

@@ -496,7 +496,7 @@ function continueFromCheckpoint() {
 }
 
 // power: charged by kills, spent on lock-in mode
-const POWER_PER_KILL = 7;
+const POWER_PER_KILL = 5; // about one lock-in per level
 let power = 0;
 // Lock-in: with POWER full, L (or the LOCK button) locks the wings in
 // attack position for LOCKIN_DURATION: the ship advances into the tunnel,
@@ -555,6 +555,7 @@ function updateHullUI() {
 // Shared damage path for anything that hurts the ship: enemy contact,
 // enemy bolts, boss contact. Keeps the flash/sound/lose-check in one place.
 function damageShip(amount) {
+  amount = Math.round(amount * getDiffParams().damage);
   plasmaHitAt = t;
   if (plasma > 0) {
     const soak = Math.min(plasma, amount);
@@ -618,9 +619,9 @@ function showLevelBanner(text) {
 // quicker minibosses punctuate the way there. All take several hits and
 // deal heavy contact damage without ending the fight on contact. Later
 // levels (and New-Game-Plus runs) field a tougher boss.
-const BOSS_HP_BASE = 5;
-const BOSS_HP_PER_LEVEL = 3;
-const MINIBOSS_HP = 3; // flat and quick — a detour, not the main event
+const BOSS_HP_BASE = 30;
+const BOSS_HP_PER_LEVEL = 8;
+const MINIBOSS_HP = 12; // flat and quick — a detour, not the main event
 const BOSS_CONTACT_DAMAGE = 22;
 const BOSS_RESET_Z = 0.55;
 let bossActive = false;
@@ -641,7 +642,7 @@ function spawnBoss(kind) {
   // Watchdog: level 2's boss, and every 6th Rift depth.
   // It sways around the tube and stomps forward every few seconds.
   const watchdog = kind === 'level' && (gameMode === 'rift' ? riftDepth % 6 === 0 : currentLevel === 2);
-  boss = { angle: 0, z: 1.0, hp: hpMax, hpMax, fireTimer: 2.0, alive: true, kind,
+  boss = { angle: Math.PI, z: 1.0, hp: hpMax, hpMax, fireTimer: 2.0, alive: true, kind,
            form: watchdog ? 'watchdog' : 'core', seed: Math.random() * 6, stompTimer: 4, lunge: 0 };
   bossActive = true;
   if (kind !== 'mini') setMusicTrack('boss');

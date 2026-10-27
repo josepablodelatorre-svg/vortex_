@@ -19,7 +19,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process
   // boss music
   await ev('hull = hullMax; killCount = 20; nextMinibossIndex = 2'); await wait(300);
   ok(await ev('bossActive && activeMusic === "boss"'), 'level boss switches to boss music (Cuerpo Ácido)');
-  for (let i = 0; i < 60 && await ev('!!boss'); i++) { await ev('hull = hullMax; if (boss) { boss.z = 0.5; bolts.push({angle: boss.angle, z: 0.5}); }'); await wait(50); }
+  for (let i = 0; i < 300 && await ev('!!boss'); i++) { await ev('hull = hullMax; if (boss) { boss.z = 0.5; bolts.push({angle: boss.angle, z: 0.5}); }'); await wait(50); }
   ok(await ev('activeMusic') === 'destruction', 'music returns after the boss');
   await ev('warpTimer = 0.01'); await wait(300);
   ok(await ev('currentLevel === 2 && missionType === "recover"'), 'level 2 = recover');

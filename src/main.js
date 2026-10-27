@@ -27,8 +27,19 @@ function loop(now) {
     requestAnimationFrame(loop);
     return;
   }
-  update(dt);
+  simulate(dt);
   draw();
+  syncRunClass();
+  drawPortrait();
+  updateClipRecording(dt);
+  if (state === 'title') drawShipPreview();
+  requestAnimationFrame(loop);
+}
+
+// one step of the game world, without any drawing (the balance simulator
+// in tools/ calls this directly to play whole runs faster than real time)
+function simulate(dt) {
+  update(dt);
   updateJackIn(dt);
   updateCoPlayers(dt);
   updateVersus(dt);
@@ -36,11 +47,6 @@ function loop(now) {
   updateTrack(dt);
   updateEnv(dt);
   updateView(dt);
-  syncRunClass();
-  drawPortrait();
-  updateClipRecording(dt);
   updateTutorial(dt);
-  if (state === 'title') drawShipPreview();
-  requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
