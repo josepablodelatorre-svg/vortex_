@@ -22,6 +22,9 @@ and, for the multiplayer tests, starts a local PeerJS server on
 port it is reused. It also runs `scores-server.js` on `127.0.0.1:8790`, a
 stand-in for the Supabase leaderboard API. Screenshots land in `tests/shots/` (not committed).
 
+GitHub runs the whole suite on every push and pull request
+(`.github/workflows/tests.yml`); a failed run attaches the screenshots.
+
 ## Files
 
 | File | Covers |

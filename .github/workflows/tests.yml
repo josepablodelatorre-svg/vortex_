@@ -1,0 +1,32 @@
+# Runs the headless browser test suite (tests/) on every push and pull
+# request. If anything fails, the screenshots the tests took are attached
+# to the run as an artifact.
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  browser-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-screenshots
+          path: tests/shots/
+          if-no-files-found: ignore
